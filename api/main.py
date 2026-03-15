@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import hashlib
 import uuid
+import os
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -64,6 +65,10 @@ class BlockchainNetwork(str, Enum):
     BNB_CHAIN = "bnb_chain"
     OPTIMISM = "optimism"
     BASE = "base"
+
+
+class ReleaseIntent(str, Enum):
+    RELEASE_APP = "release_app"
 
 # Data Models
 
@@ -135,10 +140,52 @@ class Portfolio(BaseModel):
     total_tokens: int = 0
     properties_count: int = 0
 
+
+class ReleaseGateRequest(BaseModel):
+    intent: ReleaseIntent
+    app: str
+    environment: str
+    requested_by: str
+    ci_tests_passing: bool = False
+    version_bumped: bool = False
+    second_confirmation: bool = False
+    admin_signature: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ReleaseGateDecision(BaseModel):
+    accepted: bool
+    workflow: str
+    reason: str
+    command: Optional[str] = None
+    next_step: Optional[str] = None
+
 # In-memory storage (replace with PostgreSQL in production)
 properties_db: Dict[str, Property] = {}
 investors_db: Dict[str, Investor] = {}
 transactions_db: Dict[str, TokenTransaction] = {}
+
+
+def _is_authorized_release_request(requested_by: str, admin_signature: str) -> bool:
+    """Validate release request authorization data.
+
+    In production this should verify signature material with your identity provider
+    or custody/MPC system. Here we compare against configured allowlists/secrets.
+    """
+    allowed_users = {
+        value.strip().lower()
+        for value in os.getenv("RELEASE_ALLOWED_USERS", "").split(",")
+        if value.strip()
+    }
+    expected_signature = os.getenv("RELEASE_ADMIN_SIGNATURE", "")
+
+    if allowed_users and requested_by.lower() not in allowed_users:
+        return False
+
+    if expected_signature and admin_signature != expected_signature:
+        return False
+
+    return True
 
 # API Endpoints
 
@@ -456,7 +503,50 @@ async def get_supported_networks():
         ]
     }
 
+
+@app.post("/api/release-gate", response_model=ReleaseGateDecision)
+async def release_gate(request: ReleaseGateRequest):
+    """Governed release gate for production voice-triggered deployments."""
+    if request.environment.lower() != "production":
+        raise HTTPException(status_code=400, detail="Only production environment is allowed by this gate")
+
+    if request.intent != ReleaseIntent.RELEASE_APP:
+        raise HTTPException(status_code=400, detail="Invalid intent for release gate")
+
+    if not _is_authorized_release_request(request.requested_by, request.admin_signature):
+        raise HTTPException(status_code=403, detail="Unauthorized release request")
+
+    if not request.ci_tests_passing:
+        return ReleaseGateDecision(
+            accepted=False,
+            workflow="create-production-builds.yml",
+            reason="CI test suite must pass before release",
+            next_step="Run CI and re-submit release request"
+        )
+
+    if not request.version_bumped:
+        return ReleaseGateDecision(
+            accepted=False,
+            workflow="create-production-builds.yml",
+            reason="Version bump required for production release",
+            next_step="Increment app version and re-submit release request"
+        )
+
+    if not request.second_confirmation:
+        return ReleaseGateDecision(
+            accepted=False,
+            workflow="create-production-builds.yml",
+            reason="Second confirmation required for production release",
+            next_step="Ask user to confirm deployment explicitly"
+        )
+
+    return ReleaseGateDecision(
+        accepted=True,
+        workflow="create-production-builds.yml",
+        reason="Release gate checks passed",
+        command="npx eas-cli workflow:run create-production-builds.yml"
+    )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
