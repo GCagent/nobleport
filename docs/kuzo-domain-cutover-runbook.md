@@ -13,6 +13,7 @@ Before editing DNS, define these values:
   - Vercel: `your-project.vercel.app`
   - Vultr: public IPv4 of your Gateway Brain node or reverse-proxy hostname
 - `VERIFICATION_TXT`: ownership token/hash from registrar flow (example used below: `3b52ff521bb9cb24674b4e0a5738bdd94d7508b7`)
+- `CONTROL_PLANE_ADMIN_WALLET`: `0x4bEBb12BabDE3342E03bfd3788f7de14C6909636`
 
 > DNS records are only useful once the target edge endpoint is live and can proxy to KUZO.
 
@@ -115,13 +116,34 @@ Treat KUZO as a first-class NoblePort app:
 - Keep API origin/CORS policy consistent to avoid fragmented session behavior
 - If publishing mirrored content to IPFS later, update ENS `contenthash` mapping as part of release workflow
 
-## 7) Copy/paste template for change tickets
+
+## 7) Control-plane identity binding
+
+Use the provided EVM admin wallet as the canonical KUZO app identity in NoblePort registration and policy binding:
+
+- `0x4bEBb12BabDE3342E03bfd3788f7de14C6909636`
+
+Recommended uses:
+
+- Mission Control app registration owner/admin field
+- JWT signer/issuer allowlist metadata (if wallet-linked issuer proofs are used)
+- Forensics/audit tagging so events from KUZO map to one consistent principal
+
+Quick verification example:
+
+```bash
+ADMIN_WALLET=0x4bEBb12BabDE3342E03bfd3788f7de14C6909636
+echo "$ADMIN_WALLET" | rg -n '^0x[a-fA-F0-9]{40}$'
+```
+
+## 8) Copy/paste template for change tickets
 
 ```text
 Domain: <kuzo.io>
 Primary Origin: <https://kuzo.io OR https://app.kuzo.io>
 Edge Provider: <Vercel|Vultr>
 Edge Target: <your-project.vercel.app OR public IP/hostname>
+Control-Plane Admin Wallet: 0x4bEBb12BabDE3342E03bfd3788f7de14C6909636
 DNS Records:
   - TXT @ = 3b52ff521bb9cb24674b4e0a5738bdd94d7508b7
   - A/CNAME (primary origin) = <target>
