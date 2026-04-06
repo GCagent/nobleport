@@ -51,7 +51,13 @@ The Noble Port Realty platform is built on a modern, scalable, and secure archit
 
 The platform supports nine different blockchains, providing investors with flexibility and choice. This is achieved through a blockchain abstraction layer that standardizes interactions with different networks.
 
-### 3.3. Security
+
+### 3.3. Post-Quantum Signatures (ML-DSA)
+
+The platform supports a post-quantum signature path based on ML-DSA (FIPS 204), with ML-DSA-65 as the primary deployment profile for balanced security and performance. During migration, hybrid verification policies can combine ECDSA and ML-DSA verification requirements.
+
+See [ML-DSA Implementation Details](./ml-dsa-implementation.md) for parameter tables, implementation notes, and deployment guidance.
+### 3.4. Security
 
 Security is a top priority for the Noble Port Realty platform. The following measures are implemented to protect the system and its users:
 
