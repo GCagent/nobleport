@@ -89,3 +89,31 @@ class ENSService:
         signed = self.account.sign_transaction(tx)
         tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
         return tx_hash.hex()
+
+
+
+def _core_record_pairs(settings):
+    return {
+        settings.ENS_TEXT_API_KEY: settings.PUBLIC_BASE_URL,
+        settings.ENS_TEXT_DEPLOYMENT_KEY: settings.APP_ENV,
+    }
+
+
+def update_core_records():
+    """Update core ENS text records from current settings and return tx hashes."""
+    settings = get_settings()
+    service = ENSService()
+    tx_hashes = {}
+    for key, value in _core_record_pairs(settings).items():
+        tx_hashes[key] = service.set_text(key, value)
+    return tx_hashes
+
+
+def read_core_records():
+    """Read core ENS text records and return their current values."""
+    settings = get_settings()
+    service = ENSService()
+    values = {}
+    for key in _core_record_pairs(settings):
+        values[key] = service.get_text(key)
+    return values
