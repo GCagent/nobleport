@@ -1,0 +1,48 @@
+name: Production Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "Application identifier"
+        required: true
+        default: "berns"
+      environment:
+        description: "Release environment"
+        required: true
+        default: "production"
+
+jobs:
+  build-and-submit:
+    if: ${{ github.event.inputs.environment == 'production' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Android build
+        run: eas build --platform android --profile production --non-interactive
+
+      - name: iOS build
+        run: eas build --platform ios --profile production --non-interactive
+
+      - name: Submit Android
+        run: eas submit --platform android --non-interactive
+
+      - name: Submit iOS
+        run: eas submit --platform ios --non-interactive
+
+      - name: OTA update
+        run: eas update --branch production --message "Voice triggered release"
