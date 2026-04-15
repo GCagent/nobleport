@@ -217,6 +217,10 @@ The ultra-scarce supply represents the backbone of the world's first blockchain-
 **Twitter:** [@NoblePortRealty](https://twitter.com/NoblePortRealty)  
 **Discord:** [discord.gg/nobleport](https://discord.gg/nobleport)
 
+## 🎨 NFT Launch
+
+For OpenSea go-live steps, see `docs/opensea-launch-playbook.md`.
+
 ## 📄 License
 
 Copyright © 2025 Noble Port Realty. All rights reserved.
