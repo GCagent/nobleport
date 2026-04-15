@@ -128,6 +128,15 @@ Noble Port Realty leverages Solana's Token 2022 standard to embed SEC regulation
 5. **Purchase Tokens** - Buy property tokens using USDC on your preferred blockchain
 6. **Track Portfolio** - Monitor holdings and returns through dashboard
 
+### Command Center API (112-Agent System)
+
+The backend now includes a command-center surface for monitoring and querying the six-division, 112-agent architecture used by Nobleport systems:
+
+- `GET /api/command-center/overview` — high-level operational totals and workflow metrics
+- `GET /api/command-center/divisions` — per-division counts (core, scale, monetization-critical)
+- `GET /api/command-center/agents` — full agent inventory with optional filters
+- `GET /api/command-center/revenue-engine` — prioritized 5-agent monetization engine
+
 ### For Developers
 
 ```bash

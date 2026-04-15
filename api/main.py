@@ -65,6 +65,45 @@ class BlockchainNetwork(str, Enum):
     OPTIMISM = "optimism"
     BASE = "base"
 
+
+class AgentDivision(str, Enum):
+    INTELLIGENCE_ORCHESTRATION = "intelligence_orchestration"
+    LEGAL_GOVERNANCE = "legal_governance"
+    REAL_ESTATE_CONSTRUCTION = "real_estate_construction"
+    DEFI_TREASURY = "defi_treasury"
+    VOICE_AVATAR_INTERACTION = "voice_avatar_interaction"
+    INFRA_SECURITY_DATA = "infrastructure_security_data"
+
+class AgentTier(str, Enum):
+    CORE = "core"
+    SCALE = "scale"
+
+class AgentDefinition(BaseModel):
+    id: int
+    name: str
+    division: AgentDivision
+    role: str
+    tier: AgentTier = AgentTier.SCALE
+    monetization_critical: bool = False
+
+class CommandCenterOverview(BaseModel):
+    generated_at: datetime
+    divisions: int
+    total_agents: int
+    core_agents: int
+    scale_agents: int
+    active_agents: int
+    active_workflows: int
+    lead_pipeline_jobs: int
+    payment_volume_usdc: float
+    notes: List[str]
+
+class DivisionSummary(BaseModel):
+    division: AgentDivision
+    total_agents: int
+    core_agents: int
+    monetization_critical_agents: int
+
 # Data Models
 
 class Property(BaseModel):
@@ -139,6 +178,139 @@ class Portfolio(BaseModel):
 properties_db: Dict[str, Property] = {}
 investors_db: Dict[str, Investor] = {}
 transactions_db: Dict[str, TokenTransaction] = {}
+
+AGENT_DEFINITIONS: List[AgentDefinition] = [
+    AgentDefinition(id=1, name="IQCoreModule", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="AI reasoning scoring and feedback loops", tier=AgentTier.CORE),
+    AgentDefinition(id=2, name="CUDAOrchestrator", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="GPU task execution", tier=AgentTier.CORE),
+    AgentDefinition(id=3, name="AICouncilControl", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Coordinates all agent clusters", tier=AgentTier.CORE),
+    AgentDefinition(id=4, name="TaskRouter.ai", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Routes jobs to correct clusters", tier=AgentTier.CORE),
+    AgentDefinition(id=5, name="LangGraphExecutor", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Multi-step reasoning workflows", tier=AgentTier.CORE),
+    AgentDefinition(id=6, name="TemporalFlowAgent", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Job scheduling and retries", tier=AgentTier.CORE),
+    AgentDefinition(id=7, name="MemoryVault.ai", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Long-term memory sync", tier=AgentTier.SCALE),
+    AgentDefinition(id=8, name="ContextWindowAgent", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Real-time decision context", tier=AgentTier.SCALE),
+    AgentDefinition(id=9, name="SignalProcessor.ai", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Event ingestion", tier=AgentTier.SCALE),
+    AgentDefinition(id=10, name="DecisionEngine.ai", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Final execution authority", tier=AgentTier.CORE),
+    AgentDefinition(id=11, name="MultiAgentSync", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Cross-node consistency", tier=AgentTier.SCALE),
+    AgentDefinition(id=12, name="AutonomousLearningLoop", division=AgentDivision.INTELLIGENCE_ORCHESTRATION, role="Continuous optimization", tier=AgentTier.SCALE),
+    AgentDefinition(id=13, name="NPCAgreementAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Contract automation", tier=AgentTier.CORE),
+    AgentDefinition(id=14, name="ZoningCourtAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Dispute resolution", tier=AgentTier.SCALE),
+    AgentDefinition(id=15, name="SnapshotGovernanceAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="DAO voting execution", tier=AgentTier.SCALE),
+    AgentDefinition(id=16, name="AragonControlAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Role-based permissions", tier=AgentTier.SCALE),
+    AgentDefinition(id=17, name="AuditBeaconAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Audit trail enforcement", tier=AgentTier.SCALE),
+    AgentDefinition(id=18, name="ComplianceEngine.ai", division=AgentDivision.LEGAL_GOVERNANCE, role="Reg D, KYC, AML policy", tier=AgentTier.CORE),
+    AgentDefinition(id=19, name="zkKYTMonitor", division=AgentDivision.LEGAL_GOVERNANCE, role="Transaction compliance", tier=AgentTier.SCALE),
+    AgentDefinition(id=20, name="IdentityValidator", division=AgentDivision.LEGAL_GOVERNANCE, role="Identity verification", tier=AgentTier.CORE),
+    AgentDefinition(id=21, name="PolicyEnforcementAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Governance policy enforcement", tier=AgentTier.SCALE),
+    AgentDefinition(id=22, name="LegalDocParser", division=AgentDivision.LEGAL_GOVERNANCE, role="Contract and permit parsing", tier=AgentTier.SCALE),
+    AgentDefinition(id=23, name="RiskAssessmentAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Risk scoring", tier=AgentTier.CORE),
+    AgentDefinition(id=24, name="DisputeResolutionSubAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Edge-case conflict handling", tier=AgentTier.SCALE),
+    AgentDefinition(id=25, name="DAOProposalGenerator", division=AgentDivision.LEGAL_GOVERNANCE, role="Governance proposal creation", tier=AgentTier.SCALE),
+    AgentDefinition(id=26, name="VotingAnalyticsAgent", division=AgentDivision.LEGAL_GOVERNANCE, role="Governance participation analytics", tier=AgentTier.SCALE),
+    AgentDefinition(id=27, name="ComplianceReporter", division=AgentDivision.LEGAL_GOVERNANCE, role="Regulatory reporting", tier=AgentTier.SCALE),
+    AgentDefinition(id=28, name="EthicsGuard.ai", division=AgentDivision.LEGAL_GOVERNANCE, role="Governance integrity", tier=AgentTier.SCALE),
+    AgentDefinition(id=29, name="GCagent.ai", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Master project orchestration", tier=AgentTier.CORE, monetization_critical=True),
+    AgentDefinition(id=30, name="PermitStream.ai", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Permitting and zoning automation", tier=AgentTier.CORE, monetization_critical=True),
+    AgentDefinition(id=31, name="RealEstateNFTAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Property tokenization", tier=AgentTier.SCALE),
+    AgentDefinition(id=32, name="ZoningValidationAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Zoning and GIS checks", tier=AgentTier.SCALE),
+    AgentDefinition(id=33, name="ProjectEstimator.ai", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Cost and material estimation", tier=AgentTier.SCALE),
+    AgentDefinition(id=34, name="SchedulePlanner", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Project scheduling", tier=AgentTier.SCALE),
+    AgentDefinition(id=35, name="SubcontractorRouter", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Trade assignment", tier=AgentTier.SCALE),
+    AgentDefinition(id=36, name="InspectionCoordinator", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Inspection scheduling", tier=AgentTier.SCALE),
+    AgentDefinition(id=37, name="MaterialProcurementAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Procurement logistics", tier=AgentTier.SCALE),
+    AgentDefinition(id=38, name="SiteMonitorAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Field updates and logs", tier=AgentTier.SCALE),
+    AgentDefinition(id=39, name="ChangeOrderAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Change order monetization", tier=AgentTier.SCALE),
+    AgentDefinition(id=40, name="InvoiceGenerator", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Billing automation", tier=AgentTier.SCALE),
+    AgentDefinition(id=41, name="PaymentTracker", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Payment tracking", tier=AgentTier.SCALE),
+    AgentDefinition(id=42, name="CloseoutManager", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Final QA and turnover", tier=AgentTier.SCALE),
+    AgentDefinition(id=43, name="QualityControlAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Build quality validation", tier=AgentTier.SCALE),
+    AgentDefinition(id=44, name="SafetyComplianceAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Safety and OSHA tracking", tier=AgentTier.SCALE),
+    AgentDefinition(id=45, name="EnergyEfficiencyAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Code and performance compliance", tier=AgentTier.SCALE),
+    AgentDefinition(id=46, name="BIMIntegrationAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="BIM model coordination", tier=AgentTier.SCALE),
+    AgentDefinition(id=47, name="ClientPortalAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Client communications", tier=AgentTier.SCALE),
+    AgentDefinition(id=48, name="CrewMobileAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Field crew interface", tier=AgentTier.SCALE),
+    AgentDefinition(id=49, name="LeadIntakeAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Lead conversion", tier=AgentTier.CORE, monetization_critical=True),
+    AgentDefinition(id=50, name="RevenueProtectionAgent", division=AgentDivision.REAL_ESTATE_CONSTRUCTION, role="Margin and risk monitoring", tier=AgentTier.CORE),
+    AgentDefinition(id=51, name="NPETFManager", division=AgentDivision.DEFI_TREASURY, role="Tokenized ETF engine", tier=AgentTier.SCALE),
+    AgentDefinition(id=52, name="TreasuryBotV3", division=AgentDivision.DEFI_TREASURY, role="Yield optimization", tier=AgentTier.SCALE),
+    AgentDefinition(id=53, name="FiatRouterAgent", division=AgentDivision.DEFI_TREASURY, role="Fiat to stablecoin routing", tier=AgentTier.SCALE),
+    AgentDefinition(id=54, name="LiquidityManager", division=AgentDivision.DEFI_TREASURY, role="AMM and liquidity pools", tier=AgentTier.SCALE),
+    AgentDefinition(id=55, name="NBPTTokenManager", division=AgentDivision.DEFI_TREASURY, role="Token supply management", tier=AgentTier.SCALE),
+    AgentDefinition(id=56, name="StakingEngine", division=AgentDivision.DEFI_TREASURY, role="Staking logic", tier=AgentTier.SCALE),
+    AgentDefinition(id=57, name="YieldRouter", division=AgentDivision.DEFI_TREASURY, role="DeFi allocation", tier=AgentTier.SCALE),
+    AgentDefinition(id=58, name="BondStreamAgent", division=AgentDivision.DEFI_TREASURY, role="NFT bond yields", tier=AgentTier.SCALE),
+    AgentDefinition(id=59, name="OracleSyncAgent", division=AgentDivision.DEFI_TREASURY, role="Oracle synchronization", tier=AgentTier.SCALE),
+    AgentDefinition(id=60, name="PriceFeedMonitor", division=AgentDivision.DEFI_TREASURY, role="Market data tracking", tier=AgentTier.SCALE),
+    AgentDefinition(id=61, name="RiskHedgeAgent", division=AgentDivision.DEFI_TREASURY, role="Downside hedging", tier=AgentTier.SCALE),
+    AgentDefinition(id=62, name="PortfolioBalancer", division=AgentDivision.DEFI_TREASURY, role="Treasury balancing", tier=AgentTier.SCALE),
+    AgentDefinition(id=63, name="RevenueAggregator", division=AgentDivision.DEFI_TREASURY, role="Revenue consolidation", tier=AgentTier.CORE, monetization_critical=True),
+    AgentDefinition(id=64, name="PaymentGatewayAgent", division=AgentDivision.DEFI_TREASURY, role="Multi-rail collections", tier=AgentTier.CORE, monetization_critical=True),
+    AgentDefinition(id=65, name="EscrowManager", division=AgentDivision.DEFI_TREASURY, role="Project escrow orchestration", tier=AgentTier.SCALE),
+    AgentDefinition(id=66, name="BurnMechanismAgent", division=AgentDivision.DEFI_TREASURY, role="Token burn workflows", tier=AgentTier.SCALE),
+    AgentDefinition(id=67, name="ComplianceFinanceAgent", division=AgentDivision.DEFI_TREASURY, role="Regulated financial flow checks", tier=AgentTier.SCALE),
+    AgentDefinition(id=68, name="InvestorReportingAgent", division=AgentDivision.DEFI_TREASURY, role="Investor reporting dashboards", tier=AgentTier.SCALE),
+    AgentDefinition(id=69, name="AvatarGPUAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Avatar GPU rendering", tier=AgentTier.SCALE),
+    AgentDefinition(id=70, name="NeMoVoiceAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Voice synthesis", tier=AgentTier.SCALE),
+    AgentDefinition(id=71, name="EmotionEngine", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Emotion modeling", tier=AgentTier.SCALE),
+    AgentDefinition(id=72, name="LipSyncAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Multilingual lip sync", tier=AgentTier.SCALE),
+    AgentDefinition(id=73, name="GestureEngine", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Gesture control", tier=AgentTier.SCALE),
+    AgentDefinition(id=74, name="VoiceCommandAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Voice-triggered actions", tier=AgentTier.SCALE),
+    AgentDefinition(id=75, name="CallRouterAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Call routing", tier=AgentTier.SCALE),
+    AgentDefinition(id=76, name="VoiceAnalyticsAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Call analytics", tier=AgentTier.SCALE),
+    AgentDefinition(id=77, name="VideoStreamAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Live video stream support", tier=AgentTier.SCALE),
+    AgentDefinition(id=78, name="AMAHostAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Investor AMA hosting", tier=AgentTier.SCALE),
+    AgentDefinition(id=79, name="TTSController", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Speech playback control", tier=AgentTier.SCALE),
+    AgentDefinition(id=80, name="SpeechToTextAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Transcription workflows", tier=AgentTier.SCALE),
+    AgentDefinition(id=81, name="VoiceSecurityAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Voice authentication", tier=AgentTier.SCALE),
+    AgentDefinition(id=82, name="AvatarInteractionAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Conversational avatar logic", tier=AgentTier.SCALE),
+    AgentDefinition(id=83, name="MultilingualAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Language switching", tier=AgentTier.SCALE),
+    AgentDefinition(id=84, name="VoiceCRMIntegrator", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Voice-to-CRM sync", tier=AgentTier.SCALE),
+    AgentDefinition(id=85, name="LeadVoiceIntake", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Lead capture from calls", tier=AgentTier.SCALE),
+    AgentDefinition(id=86, name="VoiceNotificationAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Voice alerts and updates", tier=AgentTier.SCALE),
+    AgentDefinition(id=87, name="VideoExplainerAgent", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="Client video walkthroughs", tier=AgentTier.SCALE),
+    AgentDefinition(id=88, name="EmotionFeedbackLoop", division=AgentDivision.VOICE_AVATAR_INTERACTION, role="UX sentiment optimization", tier=AgentTier.SCALE),
+    AgentDefinition(id=89, name="IPFSStorageAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Distributed file storage", tier=AgentTier.SCALE),
+    AgentDefinition(id=90, name="ArweaveAnchorAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Permanent records", tier=AgentTier.SCALE),
+    AgentDefinition(id=91, name="DatabaseSyncAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Postgres and Redis synchronization", tier=AgentTier.SCALE),
+    AgentDefinition(id=92, name="CacheManager", division=AgentDivision.INFRA_SECURITY_DATA, role="Performance caching", tier=AgentTier.SCALE),
+    AgentDefinition(id=93, name="APIGatewayAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="External API integration", tier=AgentTier.SCALE),
+    AgentDefinition(id=94, name="WebhookIngestAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Webhook ingestion", tier=AgentTier.SCALE),
+    AgentDefinition(id=95, name="OpenClawSecurityAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Webhook validation", tier=AgentTier.SCALE),
+    AgentDefinition(id=96, name="EncryptionAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Encryption at rest and in transit", tier=AgentTier.SCALE),
+    AgentDefinition(id=97, name="AccessControlAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Access control and permissions", tier=AgentTier.SCALE),
+    AgentDefinition(id=98, name="DDoSShieldAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Network protection", tier=AgentTier.SCALE),
+    AgentDefinition(id=99, name="NodeBalancer", division=AgentDivision.INFRA_SECURITY_DATA, role="Node load balancing", tier=AgentTier.SCALE),
+    AgentDefinition(id=100, name="TelemetryAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Metrics and observability", tier=AgentTier.SCALE),
+    AgentDefinition(id=101, name="ErrorRecoveryAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Failure recovery", tier=AgentTier.SCALE),
+    AgentDefinition(id=102, name="CICDAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Deployment automation", tier=AgentTier.SCALE),
+    AgentDefinition(id=103, name="ContainerOrchestrator", division=AgentDivision.INFRA_SECURITY_DATA, role="Container management", tier=AgentTier.SCALE),
+    AgentDefinition(id=104, name="CloudSyncAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Cloud synchronization", tier=AgentTier.SCALE),
+    AgentDefinition(id=105, name="EdgeComputeAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Low-latency edge execution", tier=AgentTier.SCALE),
+    AgentDefinition(id=106, name="GPUOptimizer", division=AgentDivision.INFRA_SECURITY_DATA, role="GPU performance tuning", tier=AgentTier.SCALE),
+    AgentDefinition(id=107, name="DataPipelineAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="ETL workflows", tier=AgentTier.SCALE),
+    AgentDefinition(id=108, name="AnalyticsEngine", division=AgentDivision.INFRA_SECURITY_DATA, role="Insights and analytics", tier=AgentTier.SCALE),
+    AgentDefinition(id=109, name="AuditLogAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Compliance logging", tier=AgentTier.SCALE),
+    AgentDefinition(id=110, name="BackupAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Backups and redundancy", tier=AgentTier.SCALE),
+    AgentDefinition(id=111, name="FailoverAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Disaster recovery", tier=AgentTier.SCALE),
+    AgentDefinition(id=112, name="SystemHealthAgent", division=AgentDivision.INFRA_SECURITY_DATA, role="Global health monitoring", tier=AgentTier.CORE),
+]
+
+REVENUE_ENGINE_AGENTS = ["LeadIntakeAgent", "GCagent.ai", "PermitStream.ai", "PaymentGatewayAgent", "RevenueAggregator"]
+
+def _division_summaries() -> List[DivisionSummary]:
+    summaries: List[DivisionSummary] = []
+
+    for division in AgentDivision:
+        scoped = [agent for agent in AGENT_DEFINITIONS if agent.division == division]
+        summaries.append(
+            DivisionSummary(
+                division=division,
+                total_agents=len(scoped),
+                core_agents=len([agent for agent in scoped if agent.tier == AgentTier.CORE]),
+                monetization_critical_agents=len([agent for agent in scoped if agent.monetization_critical])
+            )
+        )
+
+    return summaries
 
 # API Endpoints
 
@@ -436,6 +608,58 @@ async def get_compliance_report():
         "total_transaction_volume_usdc": total_volume,
         "blockchain_networks_supported": [network.value for network in BlockchainNetwork]
     }
+
+
+# Command Center Endpoints
+
+@app.get("/api/command-center/overview", response_model=CommandCenterOverview)
+async def get_command_center_overview():
+    """Get command center top-level operational status for the 112-agent system"""
+    confirmed_transactions = [transaction for transaction in transactions_db.values() if transaction.status == TransactionStatus.CONFIRMED]
+    payment_volume = sum(transaction.total_price for transaction in confirmed_transactions)
+
+    return CommandCenterOverview(
+        generated_at=datetime.utcnow(),
+        divisions=len(AgentDivision),
+        total_agents=len(AGENT_DEFINITIONS),
+        core_agents=len([agent for agent in AGENT_DEFINITIONS if agent.tier == AgentTier.CORE]),
+        scale_agents=len([agent for agent in AGENT_DEFINITIONS if agent.tier == AgentTier.SCALE]),
+        active_agents=len(AGENT_DEFINITIONS),
+        active_workflows=len(confirmed_transactions),
+        lead_pipeline_jobs=len(investors_db),
+        payment_volume_usdc=payment_volume,
+        notes=[
+            "Nobleport command center is running a six-division architecture.",
+            "Revenue engine is anchored by five monetization-critical agents.",
+            "All agent definitions are normalized for dashboard consumption."
+        ]
+    )
+
+@app.get("/api/command-center/divisions", response_model=List[DivisionSummary])
+async def get_command_center_divisions():
+    """Get per-division command center rollups"""
+    return _division_summaries()
+
+@app.get("/api/command-center/agents", response_model=List[AgentDefinition])
+async def get_command_center_agents(
+    division: Optional[AgentDivision] = None,
+    monetization_critical: Optional[bool] = None
+):
+    """Get command center agent definitions with optional filters"""
+    agents = AGENT_DEFINITIONS
+
+    if division is not None:
+        agents = [agent for agent in agents if agent.division == division]
+
+    if monetization_critical is not None:
+        agents = [agent for agent in agents if agent.monetization_critical == monetization_critical]
+
+    return agents
+
+@app.get("/api/command-center/revenue-engine", response_model=List[AgentDefinition])
+async def get_revenue_engine_agents():
+    """Get the 5 monetization-critical agents to prioritize"""
+    return [agent for agent in AGENT_DEFINITIONS if agent.name in REVENUE_ENGINE_AGENTS]
 
 # Utility Endpoints
 
