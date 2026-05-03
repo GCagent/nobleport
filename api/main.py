@@ -19,6 +19,18 @@ from enum import Enum
 import hashlib
 import uuid
 
+from collections import deque
+import os
+import re
+from api.verification.models import VerifyResponse, VerificationStatus
+from api.verification.services.providers import (
+    get_helius_account,
+    get_birdeye_liquidity,
+    get_solscan_transactions,
+)
+from api.verification.engine.scoring import helius_check, birdeye_check, solscan_check, score
+from api.verification.audit import write_audit_log
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Noble Port Realty API",
@@ -460,3 +472,69 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+
+
+BASE58_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+VERIFY_RATE_WINDOW_SECONDS = int(os.getenv("VERIFY_RATE_WINDOW_SECONDS", "60"))
+VERIFY_RATE_LIMIT = int(os.getenv("VERIFY_RATE_LIMIT", "60"))
+_verify_request_times = deque()
+
+
+def _check_rate_limit() -> bool:
+    now = datetime.utcnow()
+    while _verify_request_times and (now - _verify_request_times[0]).total_seconds() > VERIFY_RATE_WINDOW_SECONDS:
+        _verify_request_times.popleft()
+    if len(_verify_request_times) >= VERIFY_RATE_LIMIT:
+        return False
+    _verify_request_times.append(now)
+    return True
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready():
+    return {
+        "status": "ready",
+        "providers": {
+            "helius": bool(os.getenv("HELIUS_API_KEY", "")),
+            "birdeye": bool(os.getenv("BIRDEYE_API_KEY", "")),
+            "solscan": bool(os.getenv("SOLSCAN_API_KEY", "")),
+        },
+    }
+
+
+@app.post("/verify", response_model=VerifyResponse)
+async def verify(address: str):
+    if not _check_rate_limit():
+        raise HTTPException(status_code=429, detail="rate_limit_exceeded")
+
+    if not BASE58_RE.match(address):
+        return VerifyResponse(status=VerificationStatus.BLOCK, reason="invalid_address")
+
+    helius_data = get_helius_account(address)
+    birdeye_data = get_birdeye_liquidity(address)
+    solscan_data = get_solscan_transactions(address)
+
+    source_health = {
+        "helius": bool(helius_data),
+        "birdeye": bool(birdeye_data),
+        "solscan": bool(solscan_data),
+    }
+
+    if not all(source_health.values()):
+        result = VerifyResponse(status=VerificationStatus.BLOCK, reason="source_missing")
+        write_audit_log(address, VerificationStatus.BLOCK, VerificationStatus.BLOCK, VerificationStatus.BLOCK, result.status, source_health, {"helius": helius_data, "birdeye": birdeye_data, "solscan": solscan_data})
+        return result
+
+    hs = helius_check(helius_data)
+    bs = birdeye_check(birdeye_data)
+    ss = solscan_check(solscan_data, address)
+    decision = score(hs, bs, ss)
+
+    write_audit_log(address, hs, bs, ss, decision, source_health, {"helius": helius_data, "birdeye": birdeye_data, "solscan": solscan_data})
+
+    return VerifyResponse(status=decision)
