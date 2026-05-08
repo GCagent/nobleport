@@ -221,9 +221,9 @@ The ultra-scarce supply represents the backbone of the world's first blockchain-
 
 For OpenSea go-live steps, see `docs/opensea-launch-playbook.md`.
 
-## 🕸️ Internal Mesh Blueprint
+## 🧭 Operational AI Blueprint
 
-For the Stephanie.ai → GCagent.ai → PermitStream.ai → Cyborg.ai / NobleShield → KUZO.io design status, source-status semantics, and 112-agent roster gate, see `docs/internal-mesh-blueprint.md`.
+For grounded Stephanie.ai, GCagent.ai, PermitStream.ai, Cyborg.ai / NobleShield, and KUZO.io positioning, source-status semantics, construction-intake priorities, and the 112-agent ratification gate, see `docs/internal-mesh-blueprint.md`.
 
 ## 📄 License
 
