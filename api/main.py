@@ -10,14 +10,17 @@ This API provides endpoints for:
 - Multi-chain blockchain integration
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Dict
-from datetime import datetime, timedelta
-from enum import Enum
 import hashlib
 import uuid
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr, Field
+
+from .gcagent import router as gcagent_router
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -34,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(gcagent_router)
 
 # Enums
 
@@ -130,7 +134,7 @@ class TokenTransaction(BaseModel):
 
 class Portfolio(BaseModel):
     investor_id: str
-    holdings: List[Dict[str, any]] = []
+    holdings: List[Dict[str, Any]] = []
     total_value: float = 0.0
     total_tokens: int = 0
     properties_count: int = 0
