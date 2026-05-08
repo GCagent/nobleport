@@ -34,6 +34,27 @@ class Settings:
         "ENS_TEXT_DEPLOYMENT_KEY", "com.nobleport.deployment"
     )
 
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    GCAGENT_API_TOKENS: List[str] = [
+        item.strip()
+        for item in os.getenv("GCAGENT_API_TOKENS", "").split(",")
+        if item.strip()
+    ]
+    GCAGENT_MAX_UPLOAD_BYTES: int = int(
+        os.getenv("GCAGENT_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024))
+    )
+    GCAGENT_ALLOWED_AUDIO_TYPES: List[str] = [
+        item.strip()
+        for item in os.getenv(
+            "GCAGENT_ALLOWED_AUDIO_TYPES",
+            "audio/mpeg,audio/mp4,audio/wav,audio/x-wav,audio/webm,audio/ogg",
+        ).split(",")
+        if item.strip()
+    ]
+    N8N_WEBHOOK_URL: str = os.getenv("N8N_WEBHOOK_URL", "")
+    N8N_TIMEOUT_SECONDS: float = float(os.getenv("N8N_TIMEOUT_SECONDS", "10"))
+    SLACK_SIGNING_SECRET: str = os.getenv("SLACK_SIGNING_SECRET", "")
+
     ALLOWED_ORIGINS: List[str] = [
         item.strip()
         for item in os.getenv("ALLOWED_ORIGINS", "*").split(",")

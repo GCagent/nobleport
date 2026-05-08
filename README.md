@@ -62,6 +62,20 @@ Noble Port Realty leverages Solana's Token 2022 standard to embed SEC regulation
 - Programmable money enables automated distributions
 - Regulatory clarity through Circle's oversight
 
+
+## GCagent Field Operations API
+
+The backend now includes a production-hardening slice for GCagent field operations:
+
+- Authenticated `POST /api/gcagent/voice-command` voice intake with file type/size validation.
+- Transcript-gated task creation that enforces: no transcript, no task; no task, no audit log.
+- Structured JSON logging, hash-chained audit records, and failed n8n dispatch retry queue.
+- Slack Events ingress with signing-secret verification.
+- Change-order approval/rejection workflow with downloadable job-log and change-order PDFs.
+- Postgres table DDL in `db/migrations/001_gcagent_core.sql`.
+
+See `docs/gcagent-v1.md` for deployment notes and module coverage.
+
 ## 🏗️ Architecture
 
 ### API-First Design
@@ -144,7 +158,7 @@ cp .env.example .env
 
 # Run development servers
 npm run dev  # Frontend (port 3000)
-uvicorn api:app --reload  # Backend (port 8000)
+uvicorn api.main:app --reload  # Backend (port 8000)
 ```
 
 ## 📁 Repository Structure
