@@ -221,6 +221,10 @@ The ultra-scarce supply represents the backbone of the world's first blockchain-
 
 For OpenSea go-live steps, see `docs/opensea-launch-playbook.md`.
 
+## 🕸️ Internal Mesh Blueprint
+
+For the Stephanie.ai → GCagent.ai → PermitStream.ai → Cyborg.ai / NobleShield → KUZO.io design status, source-status semantics, and 112-agent roster gate, see `docs/internal-mesh-blueprint.md`.
+
 ## 📄 License
 
 Copyright © 2025 Noble Port Realty. All rights reserved.
