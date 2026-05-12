@@ -241,6 +241,10 @@ The ultra-scarce supply represents the backbone of the world's first blockchain-
 
 For OpenSea go-live steps, see `docs/opensea-launch-playbook.md`.
 
+## 🧠 AI Capability Inventory
+
+For the consolidated Stephanie.ai / NoblePort coded and architecturally defined skill inventory, see `docs/skill-capability-matrix.md`.
+
 ## 📄 License
 
 Copyright © 2025 Noble Port Realty. All rights reserved.
