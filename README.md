@@ -76,6 +76,12 @@ The backend now includes a production-hardening slice for GCagent field operatio
 
 See `docs/gcagent-v1.md` for deployment notes and module coverage.
 
+## Evidence and Verification Posture
+
+Noble Port documentation distinguishes between implemented repository assets, architecture narratives, example outputs, and independently verified production evidence. Infrastructure, TVL, validator, valuation, revenue, and large-scale task-execution claims should not be treated as investor-grade production facts unless they are backed by logs, live endpoint responses, signed telemetry, on-chain records, or revenue documents.
+
+See `docs/verification-readiness.md` for the truth-first status table and the evidence package required to move from architecture artifacts to institutional-grade operating proof.
+
 ## 🏗️ Architecture
 
 ### API-First Design
