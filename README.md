@@ -80,7 +80,7 @@ See `docs/gcagent-v1.md` for deployment notes and module coverage.
 
 Noble Port documentation distinguishes between implemented repository assets, architecture narratives, example outputs, and independently verified production evidence. Infrastructure, TVL, validator, valuation, revenue, and large-scale task-execution claims should not be treated as investor-grade production facts unless they are backed by logs, live endpoint responses, signed telemetry, on-chain records, or revenue documents.
 
-See `docs/verification-readiness.md` for the truth-first status table and the evidence package required to move from architecture artifacts to institutional-grade operating proof.
+See `docs/verification-readiness.md` for the truth-first status table and the evidence package required to move from architecture artifacts to institutional-grade operating proof. See `docs/operational-telemetry-honest-baseline.md` for the internal telemetry baseline that withdraws unsupported optimization metrics and lists required measurement actions.
 
 ## 🏗️ Architecture
 
