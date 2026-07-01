@@ -1,255 +1,73 @@
-# Noble Port Realty
+# NoblePort Field Operations API
 
-**Institutional-Grade Tokenized Real Estate with Embedded Compliance**
+**Truth status: STAGED / PENDING ACCEPTANCE VERIFICATION**
 
-Noble Port Realty combines premium real estate assets with cutting-edge blockchain technology, delivering institutional-grade compliance and unprecedented transparency for modern investors through Solana's Token 2022 standard.
+This repository contains the NoblePort FastAPI foundation for construction field operations and workflow controls. It is a staging codebase, not a certified production platform and not an offering, payment, investment, or compliance system.
 
-## 🏛️ Overview
+## What is implemented on this branch
 
-Noble Port Realty represents a fundamental transformation in real estate investment, where regulatory compliance is not merely enforced through audits but cryptographically guaranteed through smart contracts. Our platform demonstrates that blockchain technology can enhance rather than circumvent regulatory frameworks.
+- Authenticated GCagent field intake for voice-command processing.
+- Transcript-gated task creation, structured audit events, and retry handling for failed n8n dispatches.
+- Async PostgreSQL persistence for jobs, tasks, audit records, retries, and change orders.
+- Serialized audit-hash-chain writes to protect record ordering under concurrent requests.
+- Slack request signature verification.
+- Change-order approval/rejection records and basic downloadable job-log/change-order PDFs.
+- Operational request IDs, security headers, CORS/host controls, liveness, readiness, Docker, and CI checks.
+- Canonical text project IDs, allowing live identifiers such as `NP-GLORIA-2026-001` to remain intact across the ledger.
 
-### Portfolio
+## What is deliberately not production-certified
 
-**$4.4 Million+ in Premium Properties**
+- Legacy investor, KYC, token, and portfolio routes are simulation-only and disabled in production mode.
+- Payment, eSign, and financial control nodes remain staged pending their own reconciliation, security, and legal acceptance gates.
+- A production frontend is not present in this repository.
+- Shared bearer-token authentication is a staging control, not final role-based authorization.
 
-- **Miami, FL** - Luxury waterfront condominium in one of America's fastest-growing international markets
-- **Austin, TX** - Modern commercial office space in a leading technology hub
-- **Denver, CO** - Prime development land in supply-constrained market with strong population growth
+## Runtime modes
 
-**Projected Annual Returns:** 9.2%  
-**Minimum Ownership Stake:** 25%
+| Mode | Intended use | Field-operations repository | Legacy investor/token routes |
+|---|---|---|---|
+| `development` | Local development | In-memory by default | Simulation only |
+| `test` | Automated tests | In-memory | Simulation only |
+| `staging` | Protected operational validation | Postgres required for durable records | Simulation only |
+| `production` | Approved deployment only | Postgres required | Disabled |
 
-## 🔐 Technology Innovation
+`/health/live` confirms process availability. `/health/ready` is fail-closed and returns `503` until runtime configuration, database reachability, and persistent repository initialization are all demonstrated.
 
-### Token 2022 Standard (Solana)
-
-Noble Port Realty leverages Solana's Token 2022 standard to embed SEC regulations directly into smart contracts, making compliance violations technically impossible rather than merely prohibited.
-
-#### Core Compliance Features
-
-**1. SEC Rule 506(b) Enforcement**
-- Automated tracking of non-accredited investor limits (35 maximum per property)
-- Real-time verification prevents violations before they occur
-- Delaware LLC structure for each property provides proven legal framework
-
-**2. Soulbound Investor Pass**
-- Non-transferable tokens bind verified credentials to wallet addresses
-- KYC verification creates unforgeable proof of identity
-- Automated access control for all platform interactions
-- Revocable if credentials expire or issues arise
-
-**3. Zero-Knowledge Proofs**
-- Confidential transfers protect transaction amounts while maintaining validity
-- Selective disclosure allows authorized auditors full oversight
-- Mathematical privacy appeals to high-net-worth individuals and institutions
-- Compliance preservation through authorized access with decryption keys
-
-**4. Transfer Hooks**
-- Programmatic enforcement of lockup periods required under Regulation D
-- Automated verification of KYC status before allowing transfers
-- Minimum ownership percentage enforcement
-- Real-time compliance checking on every transaction
-
-**5. Multi-Chain Support**
-- **9 Blockchain Networks:** Ethereum, Solana, Arbitrum, Cardano, Polygon, Avalanche, BNB Chain, Optimism, Base
-- Network diversity provides different performance characteristics
-- Risk mitigation protects against network-specific failures
-- Cost optimization allows investors to choose lower-fee networks
-
-**6. USDC Stablecoin**
-- 1:1 peg to US dollar through full reserve backing
-- Blockchain speed without cryptocurrency volatility
-- Programmable money enables automated distributions
-- Regulatory clarity through Circle's oversight
-
-
-## GCagent Field Operations API
-
-The backend now includes a production-hardening slice for GCagent field operations:
-
-- Authenticated `POST /api/gcagent/voice-command` voice intake with file type/size validation.
-- Transcript-gated task creation that enforces: no transcript, no task; no task, no audit log.
-- Structured JSON logging, hash-chained audit records, and failed n8n dispatch retry queue.
-- Slack Events ingress with signing-secret verification.
-- Change-order approval/rejection workflow with downloadable job-log and change-order PDFs.
-- Postgres table DDL in `db/migrations/001_gcagent_core.sql`.
-
-See `docs/gcagent-v1.md` for deployment notes and module coverage.
-
-## Evidence and Verification Posture
-
-Noble Port documentation distinguishes between implemented repository assets, architecture narratives, example outputs, and independently verified production evidence. Infrastructure, TVL, validator, valuation, revenue, and large-scale task-execution claims should not be treated as investor-grade production facts unless they are backed by logs, live endpoint responses, signed telemetry, on-chain records, or revenue documents.
-
-See `docs/verification-readiness.md` for the truth-first status table and the evidence package required to move from architecture artifacts to institutional-grade operating proof.
-
-## 🏗️ Architecture
-
-### API-First Design
-
-**Frontend**
-- React 19 + Vite for modern single-page application
-- Responsive design with Montserrat typography
-- Golden amber (#D4AF37) and deep navy (#1A1A2E) premium theme
-
-**Backend**
-- Python FastAPI for RESTful API endpoints
-- PostgreSQL + DocumentDB hybrid database architecture
-- Institutional integration capabilities
-
-**Blockchain**
-- Solana blockchain with Token 2022 standard
-- Smart contracts in Rust (Anchor framework)
-- Multi-chain bridge infrastructure
-
-**External Integrations**
-- KYC/AML verification services
-- USDC infrastructure across nine networks
-- Regulatory reporting platforms
-
-## 📊 Investment Opportunity
-
-### Growth Strategies
-
-**Portfolio Expansion**
-- Acquire additional premium properties across diversified markets and asset types
-- Target high-growth metropolitan areas with strong fundamentals
-
-**Secondary Market Development**
-- Develop compliant trading infrastructure to enhance liquidity
-- Enable token holders to realize gains without property sales
-
-**Institutional Partnerships**
-- Integrate with wealth management platforms
-- Provide API access for institutional investor systems
-
-**Technology Licensing**
-- Offer compliance infrastructure to other real-world asset tokenization projects
-- Generate recurring revenue from platform licensing
-
-**Geographic Expansion**
-- Extend model to international markets with appropriate regulatory adaptations
-- Leverage multi-chain support for global accessibility
-
-### Investment Thesis
-
-✅ **Proven Model** - $4.4M+ portfolio demonstrates viability  
-✅ **Scalable Architecture** - API-first design enables rapid growth  
-✅ **Regulatory Moat** - Embedded compliance creates competitive advantage  
-✅ **Market Timing** - Convergence of blockchain maturity and regulatory clarity
-
-## 🚀 Getting Started
-
-### For Investors
-
-1. **Register** - Create account with email and wallet address
-2. **KYC Verification** - Complete identity verification process
-3. **Receive Investor Pass** - Get soulbound token enabling platform access
-4. **Browse Properties** - Explore tokenized real estate opportunities
-5. **Purchase Tokens** - Buy property tokens using USDC on your preferred blockchain
-6. **Track Portfolio** - Monitor holdings and returns through dashboard
-
-### For Developers
+## Local staging run
 
 ```bash
-# Clone the repository
-git clone https://github.com/GCagent/nobleport.git
-cd nobleport
-
-# Install dependencies
-npm install  # Frontend
-pip install -r requirements.txt  # Backend
-
-# Set up environment variables
 cp .env.example .env
-
-# Run development servers
-npm run dev  # Frontend (port 3000)
-uvicorn api.main:app --reload  # Backend (port 8000)
+# Set unique values for POSTGRES_PASSWORD and GCAGENT_API_TOKENS.
+docker compose up --build
+curl http://127.0.0.1:8000/health/live
+curl -i http://127.0.0.1:8000/health/ready
 ```
 
-## 📁 Repository Structure
+The compose stack binds the API to `127.0.0.1:8000` and keeps PostgreSQL inside the Docker network. Do not expose the staging stack publicly without an approved ingress, TLS, secrets, role-based authorization, and monitoring plan.
 
-```
-nobleport/
-├── contracts/          # Solana smart contracts (Rust/Anchor)
-│   ├── nbpt_token.rs  # Token 2022 implementation
-│   └── tests/         # Contract tests
-├── api/               # Python FastAPI backend
-│   ├── main.py        # API endpoints
-│   ├── models.py      # Data models
-│   └── blockchain.py  # Blockchain integration
-├── frontend/          # React application
-│   ├── src/
-│   │   ├── pages/     # Page components
-│   │   ├── components/# Reusable components
-│   │   └── hooks/     # Custom React hooks
-│   └── public/        # Static assets
-├── docs/              # Documentation
-│   ├── technical-specs.md
-│   ├── compliance.md
-│   └── api-reference.md
-└── README.md
-```
+## Quality gate
 
-## 🔒 Security & Compliance
+The GitHub Actions workflow checks:
 
-### Regulatory Framework
+1. Ruff linting.
+2. Python package compilation.
+3. Health and repository-contract tests.
+4. Container buildability.
 
-- **Delaware LLC Structure** - Each property operates through its own limited liability company
-- **SEC Rule 506(b)** - Private placement structure with automated investor limits
-- **Regulation D** - Lockup period enforcement through transfer hooks
-- **AML/KYC** - Mandatory verification before Investor Pass issuance
+## Promotion requirements
 
-### Security Measures
+Promotion from staging requires retained evidence that:
 
-- **Smart Contract Audits** - Third-party security reviews
-- **Multi-Signature Wallets** - Distributed control of treasury funds
-- **Circuit Breakers** - Emergency pause functionality
-- **Encrypted Storage** - Sensitive data protection
-- **Regular Penetration Testing** - Ongoing security assessments
+- The exact commit passed CI.
+- Database migration, restart persistence, retries, and audit-chain verification passed in staging.
+- Secrets are managed outside source control and have rotation procedures.
+- Authorization prevents cross-project access.
+- Backup and restore are rehearsed.
+- Three live Revenue Spine jobs reconcile from intake through closeout against source documents and financial controls.
+- A named approver signs the staging acceptance record.
 
-## 🌐 NBPT Token
+See [`docs/staged-optimization-acceptance.md`](docs/staged-optimization-acceptance.md) for the operating acceptance checklist.
 
-**Noble Port Token (NBPT)** - Ultra-scarce utility token powering the platform
+## License
 
-- **Total Supply:** 100,000,000 NBPT (fixed, no inflation)
-- **Symbol:** NBPT
-- **Standard:** Solana Token 2022
-- **Utility:** Platform fees, governance, staking rewards
-
-### Tokenomics
-
-- **Initial Circulating Supply:** 10-15% (10-15 million tokens)
-- **Vesting Schedule:** Multi-year gradual release
-- **Fee Model:** All platform transactions require NBPT for gas/fees
-- **Deflationary Pressure:** Small portions of fees burned or recycled to treasury
-
-The ultra-scarce supply represents the backbone of the world's first blockchain-secured real estate network, creating long-term value alignment between platform growth and token holders.
-
-## 📞 Contact & Resources
-
-**Website:** [nobleport.realty](https://nobleport.realty)  
-**Documentation:** [docs.nobleport.realty](https://docs.nobleport.realty)  
-**API Reference:** [api.nobleport.realty](https://api.nobleport.realty)  
-**Whitepaper:** [whitepaper.nobleport.realty](https://whitepaper.nobleport.realty)
-
-**Email:** [email protected]  
-**Twitter:** [@NoblePortRealty](https://twitter.com/NoblePortRealty)  
-**Discord:** [discord.gg/nobleport](https://discord.gg/nobleport)
-
-## 🎨 NFT Launch
-
-For OpenSea go-live steps, see `docs/opensea-launch-playbook.md`.
-
-## 📄 License
-
-Copyright © 2025 Noble Port Realty. All rights reserved.
-
-This repository contains proprietary code and documentation. Unauthorized copying, modification, distribution, or use is strictly prohibited without explicit written permission from Noble Port Realty.
-
----
-
-**Built with blockchain innovation that enhances regulatory frameworks.**
-
-*Noble Port Realty is a NoblePort Systems platform, integrating with Stephanie.ai for AI-driven optimization and the NoblePort Operations Monitor for comprehensive oversight.*
-
+Proprietary. Internal and authorized use only.
