@@ -52,15 +52,16 @@ async def ready(request: Request, response: Response) -> Dict[str, object]:
         "gcagent_persistence",
         {"ok": False, "backend": "unknown", "state": "not_initialized"},
     )
+    legacy_status = {
+        "ok": settings.is_production,
+        "state": "disabled_in_production" if settings.is_production else "staged_simulation_only",
+    }
 
     checks = {
         "configuration": {"ok": not config_errors, "errors": config_errors},
         "database": {"ok": database_ok, "state": database_state},
         "field_ops_persistence": persistence,
-        "legacy_investor_workflow": {
-            "ok": False,
-            "state": "staged_simulation_only",
-        },
+        "legacy_investor_workflow": legacy_status,
     }
     ready_state = all(check["ok"] for check in checks.values())
     if not ready_state:
