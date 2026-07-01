@@ -43,7 +43,7 @@ async def live() -> Dict[str, str]:
 
 @router.get("/health/ready")
 async def ready(request: Request, response: Response) -> Dict[str, object]:
-    """Readiness is intentionally false until persistence and runtime gates are proven."""
+    """Readiness remains false until all persistency and workflow gates are proven."""
     settings = get_settings()
     database_ok, database_state = await database_status()
     config_errors = list(getattr(request.app.state, "config_errors", settings.validation_errors()))
@@ -52,8 +52,9 @@ async def ready(request: Request, response: Response) -> Dict[str, object]:
         "configuration": {"ok": not config_errors, "errors": config_errors},
         "database": {"ok": database_ok, "state": database_state},
         "field_ops_persistence": {
-            "ok": not settings.uses_in_memory_persistence,
-            "state": settings.PERSISTENCE_BACKEND,
+            "ok": False,
+            "state": "in_memory_repository_active",
+            "configured_backend": settings.PERSISTENCE_BACKEND,
         },
         "legacy_investor_workflow": {
             "ok": False,
