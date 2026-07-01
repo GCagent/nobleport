@@ -1,11 +1,18 @@
-from fastapi.testclient import TestClient
+import asyncio
+
+import httpx
 
 from api.main import app
 
 
+async def _get(path: str) -> httpx.Response:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        return await client.get(path)
+
+
 def test_liveness_exposes_runtime_identity() -> None:
-    with TestClient(app) as client:
-        response = client.get("/health/live")
+    response = asyncio.run(_get("/health/live"))
 
     assert response.status_code == 200
     assert response.json()["status"] == "alive"
@@ -14,8 +21,7 @@ def test_liveness_exposes_runtime_identity() -> None:
 
 
 def test_readiness_is_fail_closed_without_verified_dependencies() -> None:
-    with TestClient(app) as client:
-        response = client.get("/health/ready")
+    response = asyncio.run(_get("/health/ready"))
 
     assert response.status_code == 503
     assert response.json()["status"] == "not_ready"
