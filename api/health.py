@@ -43,19 +43,20 @@ async def live() -> Dict[str, str]:
 
 @router.get("/health/ready")
 async def ready(request: Request, response: Response) -> Dict[str, object]:
-    """Readiness remains false until all persistency and workflow gates are proven."""
+    """Readiness stays false until verified dependencies and operating gates are met."""
     settings = get_settings()
     database_ok, database_state = await database_status()
     config_errors = list(getattr(request.app.state, "config_errors", settings.validation_errors()))
+    persistence = getattr(
+        request.app.state,
+        "gcagent_persistence",
+        {"ok": False, "backend": "unknown", "state": "not_initialized"},
+    )
 
     checks = {
         "configuration": {"ok": not config_errors, "errors": config_errors},
         "database": {"ok": database_ok, "state": database_state},
-        "field_ops_persistence": {
-            "ok": False,
-            "state": "in_memory_repository_active",
-            "configured_backend": settings.PERSISTENCE_BACKEND,
-        },
+        "field_ops_persistence": persistence,
         "legacy_investor_workflow": {
             "ok": False,
             "state": "staged_simulation_only",
