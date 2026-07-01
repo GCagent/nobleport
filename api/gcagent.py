@@ -1,21 +1,23 @@
-"""GCagent field operations API.
+"""GCagent field-operations API with persistent Postgres support.
 
-This module hardens the prototype voice-upload flow into a production-oriented
-FastAPI stack with authentication, validation, structured audit events,
-Slack signature verification, async n8n dispatch, retry visibility, and
-change-order/PDF workflows.
+The module supports an explicit in-memory backend for development/test only and
+an async Postgres repository for staging/production. Every write is paired with
+an audit record, and the audit hash chain is serialized in Postgres.
 """
 
-import asyncio
+from __future__ import annotations
+
 import hashlib
 import hmac
 import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+import asyncpg
 import httpx
 from fastapi import (
     APIRouter,
@@ -36,7 +38,7 @@ from .settings import get_settings
 
 POSTGRES_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS gcagent_jobs (
-    id UUID PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     location TEXT,
     status TEXT NOT NULL DEFAULT 'active',
@@ -45,8 +47,8 @@ CREATE TABLE IF NOT EXISTS gcagent_jobs (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_tasks (
-    id UUID PRIMARY KEY,
-    job_id UUID NOT NULL REFERENCES gcagent_jobs(id),
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES gcagent_jobs(id),
     source TEXT NOT NULL,
     category TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -58,9 +60,9 @@ CREATE TABLE IF NOT EXISTS gcagent_tasks (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_audit_logs (
-    id UUID PRIMARY KEY,
-    job_id UUID REFERENCES gcagent_jobs(id),
-    task_id UUID REFERENCES gcagent_tasks(id),
+    id TEXT PRIMARY KEY,
+    job_id TEXT REFERENCES gcagent_jobs(id),
+    task_id TEXT REFERENCES gcagent_tasks(id),
     actor TEXT NOT NULL,
     action TEXT NOT NULL,
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -70,8 +72,8 @@ CREATE TABLE IF NOT EXISTS gcagent_audit_logs (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_retry_queue (
-    id UUID PRIMARY KEY,
-    task_id UUID NOT NULL REFERENCES gcagent_tasks(id),
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES gcagent_tasks(id),
     target TEXT NOT NULL,
     payload JSONB NOT NULL,
     attempts INTEGER NOT NULL DEFAULT 0,
@@ -83,9 +85,9 @@ CREATE TABLE IF NOT EXISTS gcagent_retry_queue (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_change_orders (
-    id UUID PRIMARY KEY,
-    job_id UUID NOT NULL REFERENCES gcagent_jobs(id),
-    task_id UUID REFERENCES gcagent_tasks(id),
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES gcagent_jobs(id),
+    task_id TEXT REFERENCES gcagent_tasks(id),
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     cost_delta NUMERIC(12, 2) NOT NULL DEFAULT 0,
@@ -97,11 +99,16 @@ CREATE TABLE IF NOT EXISTS gcagent_change_orders (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_gcagent_tasks_job_id ON gcagent_tasks(job_id);
+CREATE INDEX IF NOT EXISTS idx_gcagent_audit_logs_job_created ON gcagent_audit_logs(job_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_gcagent_retry_queue_status_next ON gcagent_retry_queue(status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_gcagent_change_orders_job_id ON gcagent_change_orders(job_id);
 """.strip()
 
 
 class JsonFormatter(logging.Formatter):
-    """Small structured logger for production ingestion."""
+    """Small structured logger for field-operation ingestion."""
 
     def format(self, record: logging.LogRecord) -> str:
         payload = {
@@ -149,21 +156,21 @@ class ChangeOrderStatus(str, Enum):
 
 
 class GCJob(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    location: Optional[str] = None
+    id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=256)
+    location: Optional[str] = Field(default=None, max_length=512)
     status: str = "active"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class GCTask(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    job_id: str
-    source: str
+    job_id: str = Field(min_length=1, max_length=128)
+    source: str = Field(min_length=1, max_length=100)
     category: TaskCategory
-    title: str
-    transcript: str
-    assignee: Optional[str] = None
+    title: str = Field(min_length=1, max_length=512)
+    transcript: str = Field(min_length=1)
+    assignee: Optional[str] = Field(default=None, max_length=256)
     status: TaskStatus = TaskStatus.QUEUED
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -172,8 +179,8 @@ class AuditLog(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: Optional[str] = None
     task_id: Optional[str] = None
-    actor: str
-    action: str
+    actor: str = Field(min_length=1, max_length=256)
+    action: str = Field(min_length=1, max_length=256)
     payload: Dict[str, Any] = Field(default_factory=dict)
     previous_hash: Optional[str] = None
     hash: str
@@ -195,31 +202,31 @@ class ChangeOrder(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str
     task_id: Optional[str] = None
-    title: str
-    description: str
+    title: str = Field(min_length=1, max_length=512)
+    description: str = Field(min_length=1)
     cost_delta: float = 0.0
     schedule_delta_days: int = 0
     status: ChangeOrderStatus = ChangeOrderStatus.PENDING_APPROVAL
-    requested_by: str
+    requested_by: str = Field(min_length=1, max_length=256)
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ChangeOrderCreate(BaseModel):
-    job_id: str
+    job_id: str = Field(min_length=1, max_length=128)
     task_id: Optional[str] = None
-    title: str
-    description: str
+    title: str = Field(min_length=1, max_length=512)
+    description: str = Field(min_length=1)
     cost_delta: float = 0.0
     schedule_delta_days: int = 0
-    requested_by: str
+    requested_by: str = Field(min_length=1, max_length=256)
 
 
 class ChangeOrderDecision(BaseModel):
-    approver: str
+    approver: str = Field(min_length=1, max_length=256)
     approved: bool
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=2000)
 
 
 class VoiceCommandResponse(BaseModel):
@@ -231,8 +238,47 @@ class VoiceCommandResponse(BaseModel):
     retry_id: Optional[str] = None
 
 
+def jsonable_model(model: BaseModel) -> Dict[str, Any]:
+    return model.model_dump(mode="json")
+
+
+def _audit_hash(
+    job_id: Optional[str],
+    task_id: Optional[str],
+    actor: str,
+    action: str,
+    payload: Dict[str, Any],
+    previous_hash: Optional[str],
+) -> str:
+    serialized = json.dumps(
+        {
+            "job_id": job_id,
+            "task_id": task_id,
+            "actor": actor,
+            "action": action,
+            "payload": payload,
+            "previous_hash": previous_hash,
+        },
+        sort_keys=True,
+        default=str,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized.encode()).hexdigest()
+
+
+def _json_value(value: Any) -> Dict[str, Any]:
+    if isinstance(value, str):
+        return json.loads(value)
+    if isinstance(value, dict):
+        return value
+    return dict(value or {})
+
+
 class InMemoryGCRepository:
-    """Repository used in dev/test until DATABASE_URL-backed persistence is wired."""
+    """Development/test implementation. Never acceptable for production data."""
+
+    persistent = False
+    backend = "memory"
 
     def __init__(self) -> None:
         self.jobs: Dict[str, GCJob] = {}
@@ -241,19 +287,31 @@ class InMemoryGCRepository:
         self.retry_queue: Dict[str, RetryQueueItem] = {}
         self.change_orders: Dict[str, ChangeOrder] = {}
 
-    def ensure_job(self, job_id: str, name: Optional[str] = None) -> GCJob:
+    async def startup(self) -> None:
+        return None
+
+    async def shutdown(self) -> None:
+        return None
+
+    async def ensure_job(self, job_id: str, name: Optional[str] = None) -> GCJob:
         if job_id not in self.jobs:
-            self.jobs[job_id] = GCJob(id=job_id, name=name or f"Job {job_id[:8]}")
+            self.jobs[job_id] = GCJob(id=job_id, name=name or f"Job {job_id[:24]}")
         return self.jobs[job_id]
 
-    def create_task(self, task: GCTask) -> GCTask:
+    async def get_job(self, job_id: str) -> Optional[GCJob]:
+        return self.jobs.get(job_id)
+
+    async def create_task(self, task: GCTask) -> GCTask:
         self.tasks[task.id] = task
         return task
 
-    def update_task_status(self, task_id: str, task_status: TaskStatus) -> None:
+    async def get_task(self, task_id: str) -> Optional[GCTask]:
+        return self.tasks.get(task_id)
+
+    async def update_task_status(self, task_id: str, task_status: TaskStatus) -> None:
         self.tasks[task_id].status = task_status
 
-    def append_audit(
+    async def append_audit(
         self,
         job_id: Optional[str],
         task_id: Optional[str],
@@ -262,19 +320,6 @@ class InMemoryGCRepository:
         payload: Dict[str, Any],
     ) -> AuditLog:
         previous_hash = self.audit_logs[-1].hash if self.audit_logs else None
-        hash_payload = json.dumps(
-            {
-                "job_id": job_id,
-                "task_id": task_id,
-                "actor": actor,
-                "action": action,
-                "payload": payload,
-                "previous_hash": previous_hash,
-            },
-            sort_keys=True,
-            default=str,
-        )
-        digest = hashlib.sha256(hash_payload.encode()).hexdigest()
         audit = AuditLog(
             job_id=job_id,
             task_id=task_id,
@@ -282,28 +327,348 @@ class InMemoryGCRepository:
             action=action,
             payload=payload,
             previous_hash=previous_hash,
-            hash=digest,
+            hash=_audit_hash(job_id, task_id, actor, action, payload, previous_hash),
         )
         self.audit_logs.append(audit)
         return audit
 
-    def enqueue_retry(self, item: RetryQueueItem) -> RetryQueueItem:
+    async def list_audits(self, job_id: str) -> List[AuditLog]:
+        return [audit for audit in self.audit_logs if audit.job_id == job_id]
+
+    async def enqueue_retry(self, item: RetryQueueItem) -> RetryQueueItem:
         self.retry_queue[item.id] = item
         return item
 
-    def create_change_order(self, change_order: ChangeOrder) -> ChangeOrder:
+    async def get_retry(self, retry_id: str) -> Optional[RetryQueueItem]:
+        return self.retry_queue.get(retry_id)
+
+    async def mark_retry_failed(self, retry_id: str, error: str) -> None:
+        item = self.retry_queue[retry_id]
+        item.attempts += 1
+        item.last_error = error
+        item.status = "pending"
+
+    async def mark_retry_completed(self, retry_id: str) -> None:
+        item = self.retry_queue[retry_id]
+        item.attempts += 1
+        item.last_error = None
+        item.status = "completed"
+
+    async def create_change_order(self, change_order: ChangeOrder) -> ChangeOrder:
         self.change_orders[change_order.id] = change_order
         return change_order
 
+    async def get_change_order(self, change_order_id: str) -> Optional[ChangeOrder]:
+        return self.change_orders.get(change_order_id)
 
-repository = InMemoryGCRepository()
+    async def decide_change_order(
+        self,
+        change_order_id: str,
+        status_value: ChangeOrderStatus,
+        approver: str,
+        approved_at: datetime,
+    ) -> Optional[ChangeOrder]:
+        change_order = self.change_orders.get(change_order_id)
+        if change_order is None:
+            return None
+        change_order.status = status_value
+        change_order.approved_by = approver
+        change_order.approved_at = approved_at
+        return change_order
+
+
+class PostgresGCRepository:
+    """Async PostgreSQL repository for durable GCagent operational records."""
+
+    persistent = True
+    backend = "postgres"
+
+    def __init__(self, database_url: str) -> None:
+        self.database_url = database_url
+        self.pool: Optional[asyncpg.Pool] = None
+
+    def _pool(self) -> asyncpg.Pool:
+        if self.pool is None:
+            raise RuntimeError("GCagent Postgres repository is not initialized")
+        return self.pool
+
+    async def startup(self) -> None:
+        self.pool = await asyncpg.create_pool(
+            dsn=self.database_url,
+            min_size=1,
+            max_size=5,
+            command_timeout=10,
+        )
+        async with self._pool().acquire() as connection:
+            table = await connection.fetchval("SELECT to_regclass('public.gcagent_jobs')")
+        if table is None:
+            await self.shutdown()
+            raise RuntimeError("GCagent migration is missing: gcagent_jobs table not found")
+
+    async def shutdown(self) -> None:
+        if self.pool is not None:
+            await self.pool.close()
+            self.pool = None
+
+    async def ensure_job(self, job_id: str, name: Optional[str] = None) -> GCJob:
+        row = await self._pool().fetchrow(
+            """
+            INSERT INTO gcagent_jobs (id, name)
+            VALUES ($1, $2)
+            ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
+            RETURNING id, name, location, status, created_at
+            """,
+            job_id,
+            name or f"Job {job_id[:24]}",
+        )
+        return GCJob(**dict(row))
+
+    async def get_job(self, job_id: str) -> Optional[GCJob]:
+        row = await self._pool().fetchrow(
+            "SELECT id, name, location, status, created_at FROM gcagent_jobs WHERE id = $1",
+            job_id,
+        )
+        return GCJob(**dict(row)) if row else None
+
+    async def create_task(self, task: GCTask) -> GCTask:
+        row = await self._pool().fetchrow(
+            """
+            INSERT INTO gcagent_tasks (id, job_id, source, category, title, transcript, assignee, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, job_id, source, category, title, transcript, assignee, status, created_at
+            """,
+            task.id,
+            task.job_id,
+            task.source,
+            task.category.value,
+            task.title,
+            task.transcript,
+            task.assignee,
+            task.status.value,
+        )
+        return GCTask(**dict(row))
+
+    async def get_task(self, task_id: str) -> Optional[GCTask]:
+        row = await self._pool().fetchrow(
+            """
+            SELECT id, job_id, source, category, title, transcript, assignee, status, created_at
+            FROM gcagent_tasks WHERE id = $1
+            """,
+            task_id,
+        )
+        return GCTask(**dict(row)) if row else None
+
+    async def update_task_status(self, task_id: str, task_status: TaskStatus) -> None:
+        result = await self._pool().execute(
+            "UPDATE gcagent_tasks SET status = $2, updated_at = NOW() WHERE id = $1",
+            task_id,
+            task_status.value,
+        )
+        if result.endswith("0"):
+            raise KeyError(f"Task not found: {task_id}")
+
+    async def append_audit(
+        self,
+        job_id: Optional[str],
+        task_id: Optional[str],
+        actor: str,
+        action: str,
+        payload: Dict[str, Any],
+    ) -> AuditLog:
+        payload_json = json.dumps(payload, sort_keys=True, default=str)
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext('gcagent_audit_chain'))"
+                )
+                previous_hash = await connection.fetchval(
+                    "SELECT hash FROM gcagent_audit_logs ORDER BY created_at DESC, id DESC LIMIT 1"
+                )
+                digest = _audit_hash(job_id, task_id, actor, action, payload, previous_hash)
+                row = await connection.fetchrow(
+                    """
+                    INSERT INTO gcagent_audit_logs
+                        (id, job_id, task_id, actor, action, payload, previous_hash, hash)
+                    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+                    RETURNING id, job_id, task_id, actor, action, payload, previous_hash, hash, created_at
+                    """,
+                    str(uuid.uuid4()),
+                    job_id,
+                    task_id,
+                    actor,
+                    action,
+                    payload_json,
+                    previous_hash,
+                    digest,
+                )
+        values = dict(row)
+        values["payload"] = _json_value(values["payload"])
+        return AuditLog(**values)
+
+    async def list_audits(self, job_id: str) -> List[AuditLog]:
+        rows = await self._pool().fetch(
+            """
+            SELECT id, job_id, task_id, actor, action, payload, previous_hash, hash, created_at
+            FROM gcagent_audit_logs
+            WHERE job_id = $1
+            ORDER BY created_at ASC, id ASC
+            """,
+            job_id,
+        )
+        audits: List[AuditLog] = []
+        for row in rows:
+            values = dict(row)
+            values["payload"] = _json_value(values["payload"])
+            audits.append(AuditLog(**values))
+        return audits
+
+    async def enqueue_retry(self, item: RetryQueueItem) -> RetryQueueItem:
+        row = await self._pool().fetchrow(
+            """
+            INSERT INTO gcagent_retry_queue (id, task_id, target, payload, attempts, last_error, status)
+            VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
+            RETURNING id, task_id, target, payload, attempts, last_error, status, created_at
+            """,
+            item.id,
+            item.task_id,
+            item.target,
+            json.dumps(item.payload, sort_keys=True, default=str),
+            item.attempts,
+            item.last_error,
+            item.status,
+        )
+        values = dict(row)
+        values["payload"] = _json_value(values["payload"])
+        return RetryQueueItem(**values)
+
+    async def get_retry(self, retry_id: str) -> Optional[RetryQueueItem]:
+        row = await self._pool().fetchrow(
+            """
+            SELECT id, task_id, target, payload, attempts, last_error, status, created_at
+            FROM gcagent_retry_queue WHERE id = $1
+            """,
+            retry_id,
+        )
+        if row is None:
+            return None
+        values = dict(row)
+        values["payload"] = _json_value(values["payload"])
+        return RetryQueueItem(**values)
+
+    async def mark_retry_failed(self, retry_id: str, error: str) -> None:
+        await self._pool().execute(
+            """
+            UPDATE gcagent_retry_queue
+            SET attempts = attempts + 1, last_error = $2, status = 'pending', updated_at = NOW()
+            WHERE id = $1
+            """,
+            retry_id,
+            error[:4000],
+        )
+
+    async def mark_retry_completed(self, retry_id: str) -> None:
+        await self._pool().execute(
+            """
+            UPDATE gcagent_retry_queue
+            SET attempts = attempts + 1, last_error = NULL, status = 'completed', updated_at = NOW()
+            WHERE id = $1
+            """,
+            retry_id,
+        )
+
+    async def create_change_order(self, change_order: ChangeOrder) -> ChangeOrder:
+        row = await self._pool().fetchrow(
+            """
+            INSERT INTO gcagent_change_orders
+                (id, job_id, task_id, title, description, cost_delta, schedule_delta_days, status, requested_by)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, job_id, task_id, title, description, cost_delta, schedule_delta_days,
+                      status, requested_by, approved_by, approved_at, created_at
+            """,
+            change_order.id,
+            change_order.job_id,
+            change_order.task_id,
+            change_order.title,
+            change_order.description,
+            Decimal(str(change_order.cost_delta)),
+            change_order.schedule_delta_days,
+            change_order.status.value,
+            change_order.requested_by,
+        )
+        return self._change_order_from_row(row)
+
+    async def get_change_order(self, change_order_id: str) -> Optional[ChangeOrder]:
+        row = await self._pool().fetchrow(
+            """
+            SELECT id, job_id, task_id, title, description, cost_delta, schedule_delta_days,
+                   status, requested_by, approved_by, approved_at, created_at
+            FROM gcagent_change_orders WHERE id = $1
+            """,
+            change_order_id,
+        )
+        return self._change_order_from_row(row) if row else None
+
+    async def decide_change_order(
+        self,
+        change_order_id: str,
+        status_value: ChangeOrderStatus,
+        approver: str,
+        approved_at: datetime,
+    ) -> Optional[ChangeOrder]:
+        row = await self._pool().fetchrow(
+            """
+            UPDATE gcagent_change_orders
+            SET status = $2, approved_by = $3, approved_at = $4, updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, job_id, task_id, title, description, cost_delta, schedule_delta_days,
+                      status, requested_by, approved_by, approved_at, created_at
+            """,
+            change_order_id,
+            status_value.value,
+            approver,
+            approved_at,
+        )
+        return self._change_order_from_row(row) if row else None
+
+    @staticmethod
+    def _change_order_from_row(row: asyncpg.Record) -> ChangeOrder:
+        values = dict(row)
+        values["cost_delta"] = float(values["cost_delta"])
+        return ChangeOrder(**values)
+
+
+repository: Any = InMemoryGCRepository()
 router = APIRouter(prefix="/api/gcagent", tags=["gcagent"])
 
 
-def jsonable_model(model: BaseModel) -> Dict[str, Any]:
-    if hasattr(model, "model_dump"):
-        return model.model_dump(mode="json")
-    return json.loads(json.dumps(model.dict(), default=str))
+async def configure_repository() -> Dict[str, Any]:
+    """Select and initialize the repository once per application process."""
+    global repository
+    settings = get_settings()
+
+    if settings.PERSISTENCE_BACKEND == "postgres":
+        candidate = PostgresGCRepository(settings.DATABASE_URL)
+        await candidate.startup()
+        repository = candidate
+    else:
+        repository = InMemoryGCRepository()
+        await repository.startup()
+
+    return repository_status()
+
+
+async def shutdown_repository() -> None:
+    await repository.shutdown()
+
+
+def repository_status() -> Dict[str, Any]:
+    return {
+        "ok": bool(getattr(repository, "persistent", False)),
+        "backend": str(getattr(repository, "backend", "unknown")),
+        "state": "persistent_repository_active"
+        if getattr(repository, "persistent", False)
+        else "in_memory_repository_active",
+    }
 
 
 async def require_gcagent_auth(authorization: str = Header(default="")) -> str:
@@ -378,40 +743,42 @@ async def validate_audio_upload(file: UploadFile) -> bytes:
     return payload
 
 
-async def dispatch_to_n8n(task: GCTask, audit: AuditLog) -> Optional[RetryQueueItem]:
+async def dispatch_to_n8n(
+    task: GCTask,
+    audit: AuditLog,
+    retry_id: Optional[str] = None,
+) -> Optional[RetryQueueItem]:
     settings = get_settings()
+    payload = {"task": jsonable_model(task), "audit": jsonable_model(audit)}
+
     if not settings.N8N_WEBHOOK_URL:
-        repository.update_task_status(task.id, TaskStatus.BLOCKED)
-        return repository.enqueue_retry(
-            RetryQueueItem(
-                task_id=task.id,
-                target="n8n",
-                payload={"task": jsonable_model(task), "audit": jsonable_model(audit)},
-                last_error="N8N_WEBHOOK_URL is not configured",
-            )
+        await repository.update_task_status(task.id, TaskStatus.BLOCKED)
+        error = "N8N_WEBHOOK_URL is not configured"
+        if retry_id:
+            await repository.mark_retry_failed(retry_id, error)
+            return await repository.get_retry(retry_id)
+        return await repository.enqueue_retry(
+            RetryQueueItem(task_id=task.id, target="n8n", payload=payload, last_error=error)
         )
 
-    payload = {"task": jsonable_model(task), "audit": jsonable_model(audit)}
     try:
         async with httpx.AsyncClient(timeout=settings.N8N_TIMEOUT_SECONDS) as client:
             response = await client.post(settings.N8N_WEBHOOK_URL, json=payload)
             response.raise_for_status()
     except httpx.HTTPError as exc:
-        repository.update_task_status(task.id, TaskStatus.BLOCKED)
-        logger.error(
-            "n8n dispatch failed",
-            extra={"context": {"task_id": task.id, "error": str(exc)}},
-        )
-        return repository.enqueue_retry(
-            RetryQueueItem(
-                task_id=task.id,
-                target="n8n",
-                payload=payload,
-                last_error=str(exc),
-            )
+        await repository.update_task_status(task.id, TaskStatus.BLOCKED)
+        error = str(exc)
+        logger.error("n8n dispatch failed", extra={"context": {"task_id": task.id, "error": error}})
+        if retry_id:
+            await repository.mark_retry_failed(retry_id, error)
+            return await repository.get_retry(retry_id)
+        return await repository.enqueue_retry(
+            RetryQueueItem(task_id=task.id, target="n8n", payload=payload, last_error=error)
         )
 
-    repository.update_task_status(task.id, TaskStatus.DISPATCHED)
+    await repository.update_task_status(task.id, TaskStatus.DISPATCHED)
+    if retry_id:
+        await repository.mark_retry_completed(retry_id)
     logger.info("n8n dispatch succeeded", extra={"context": {"task_id": task.id}})
     return None
 
@@ -428,9 +795,7 @@ def verify_slack_signature(body: bytes, timestamp: str, signature: str) -> None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Slack signature timestamp",
         )
-    try_timestamp = int(timestamp)
-    now_timestamp = int(datetime.now(timezone.utc).timestamp())
-    if abs(now_timestamp - try_timestamp) > 300:
+    if abs(int(datetime.now(timezone.utc).timestamp()) - int(timestamp)) > 300:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Stale Slack signature timestamp",
@@ -488,6 +853,11 @@ async def postgres_schema(_: str = Depends(require_gcagent_auth)) -> Dict[str, s
     return {"postgres_schema_sql": POSTGRES_SCHEMA_SQL}
 
 
+@router.get("/persistence")
+async def persistence_status(_: str = Depends(require_gcagent_auth)) -> Dict[str, Any]:
+    return repository_status()
+
+
 @router.post(
     "/voice-command",
     response_model=VoiceCommandResponse,
@@ -507,10 +877,10 @@ async def voice_command(
             detail="No transcript, no task",
         )
     audio = await validate_audio_upload(file)
-    repository.ensure_job(job_id)
+    await repository.ensure_job(job_id)
     category = classify_transcript(clean_transcript)
     routed_to = route_task(category)
-    task = repository.create_task(
+    task = await repository.create_task(
         GCTask(
             job_id=job_id,
             source="voice-command",
@@ -520,7 +890,7 @@ async def voice_command(
             assignee=routed_to,
         )
     )
-    audit = repository.append_audit(
+    audit = await repository.append_audit(
         job_id=job_id,
         task_id=task.id,
         actor=actor,
@@ -533,13 +903,12 @@ async def voice_command(
         },
     )
     retry = await dispatch_to_n8n(task, audit)
-    n8n_status = "queued_for_retry" if retry else "dispatched"
     return VoiceCommandResponse(
         job_id=job_id,
         task_id=task.id,
         audit_id=audit.id,
         routed_to=routed_to,
-        n8n_status=n8n_status,
+        n8n_status="queued_for_retry" if retry else "dispatched",
         retry_id=retry.id if retry else None,
     )
 
@@ -553,7 +922,7 @@ async def slack_events(request: Request) -> Dict[str, str]:
     payload = await request.json()
     if payload.get("type") == "url_verification":
         return {"challenge": payload.get("challenge", "")}
-    repository.append_audit(
+    await repository.append_audit(
         None,
         None,
         payload.get("user_id", "slack"),
@@ -572,11 +941,11 @@ async def create_change_order(
     change_order_data: ChangeOrderCreate,
     _: str = Depends(require_gcagent_auth),
 ) -> ChangeOrder:
-    repository.ensure_job(change_order_data.job_id)
-    change_order = repository.create_change_order(
+    await repository.ensure_job(change_order_data.job_id)
+    change_order = await repository.create_change_order(
         ChangeOrder(**jsonable_model(change_order_data))
     )
-    repository.append_audit(
+    await repository.append_audit(
         change_order.job_id,
         change_order.task_id,
         change_order.requested_by,
@@ -592,20 +961,18 @@ async def decide_change_order(
     decision: ChangeOrderDecision,
     _: str = Depends(require_gcagent_auth),
 ) -> ChangeOrder:
-    if change_order_id not in repository.change_orders:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Change order not found",
-        )
-    change_order = repository.change_orders[change_order_id]
-    change_order.status = (
-        ChangeOrderStatus.APPROVED
-        if decision.approved
-        else ChangeOrderStatus.REJECTED
+    decision_status = (
+        ChangeOrderStatus.APPROVED if decision.approved else ChangeOrderStatus.REJECTED
     )
-    change_order.approved_by = decision.approver
-    change_order.approved_at = datetime.now(timezone.utc)
-    repository.append_audit(
+    change_order = await repository.decide_change_order(
+        change_order_id,
+        decision_status,
+        decision.approver,
+        datetime.now(timezone.utc),
+    )
+    if change_order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Change order not found")
+    await repository.append_audit(
         change_order.job_id,
         change_order.task_id,
         decision.approver,
@@ -617,22 +984,20 @@ async def decide_change_order(
 
 @router.get("/jobs/{job_id}/log.pdf")
 async def job_log_pdf(job_id: str, _: str = Depends(require_gcagent_auth)) -> Response:
-    if job_id not in repository.jobs:
+    job = await repository.get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    audits = await repository.list_audits(job_id)
     lines = [
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
+        f"Job: {job.name}",
         "Audit chain:",
         *[
-            f"{audit.created_at.isoformat()} {audit.action} "
-            f"task={audit.task_id or '-'} hash={audit.hash[:12]}"
-            for audit in repository.audit_logs
-            if audit.job_id == job_id
+            f"{audit.created_at.isoformat()} {audit.action} task={audit.task_id or '-'} hash={audit.hash[:12]}"
+            for audit in audits
         ],
     ]
-    return Response(
-        build_minimal_pdf(f"GCagent Job Log {job_id}", lines),
-        media_type="application/pdf",
-    )
+    return Response(build_minimal_pdf(f"GCagent Job Log {job_id}", lines), media_type="application/pdf")
 
 
 @router.get("/change-orders/{change_order_id}.pdf")
@@ -640,12 +1005,12 @@ async def change_order_pdf(
     change_order_id: str,
     _: str = Depends(require_gcagent_auth),
 ) -> Response:
-    if change_order_id not in repository.change_orders:
+    change_order = await repository.get_change_order(change_order_id)
+    if change_order is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Change order not found",
         )
-    change_order = repository.change_orders[change_order_id]
     lines = [
         f"Status: {change_order.status.value}",
         f"Requested by: {change_order.requested_by}",
@@ -665,23 +1030,19 @@ async def run_retry(
     retry_id: str,
     _: str = Depends(require_gcagent_auth),
 ) -> Dict[str, str]:
-    if retry_id not in repository.retry_queue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Retry item not found",
-        )
-    item = repository.retry_queue[retry_id]
-    item.attempts += 1
-    task = repository.tasks[item.task_id]
-    audit = repository.append_audit(
+    item = await repository.get_retry(retry_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Retry item not found")
+    task = await repository.get_task(item.task_id)
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    audit = await repository.append_audit(
         task.job_id,
         task.id,
         "retry-worker",
         "retry.n8n.started",
         {"retry_id": retry_id},
     )
-    retry = await dispatch_to_n8n(task, audit)
-    if retry is None:
-        item.status = "completed"
-    await asyncio.sleep(0)
-    return {"status": item.status}
+    retry = await dispatch_to_n8n(task, audit, retry_id=retry_id)
+    current = await repository.get_retry(retry_id)
+    return {"status": current.status if current else ("pending" if retry else "completed")}
