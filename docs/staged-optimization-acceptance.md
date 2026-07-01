@@ -14,12 +14,14 @@ This branch establishes a defensible staging baseline for the NoblePort API. It 
 - CI checks for linting, bytecode compilation, tests, and container buildability.
 - Raw SSNs and identity document payloads removed from the staged KYC request contract.
 - Legacy investor/token routes marked simulation-only and disabled in production.
-- GCagent production requests blocked until an actual Postgres repository adapter replaces the in-memory repository.
+- Async Postgres persistence for GCagent jobs, tasks, audits, retries, and change orders.
+- Transaction-serialized audit-chain writes, preventing concurrent audit events from splitting the hash chain.
+- Canonical text project IDs are retained in the field-operations schema, including IDs such as `NP-GLORIA-2026-001`.
 
 ## Current hard blockers
 
-1. **GCagent persistence:** `api/gcagent.py` still uses `InMemoryGCRepository`; implement async Postgres reads/writes for jobs, tasks, audit records, retry queue, and change orders.
-2. **Migration discipline:** run the migration through a versioned migration runner and prove rollback/restore against a clean database.
+1. **Persistence proof:** run the database migration against a clean staging database, prove jobs/tasks/change orders survive restart, and prove retry updates do not duplicate queue records.
+2. **Migration discipline:** introduce a versioned migration runner and prove rollback/restore. The repository migration is suitable for a new staging database; do not apply a type-changing schema replacement to a populated environment without a reviewed migration plan.
 3. **Secrets:** place all API tokens, Slack secrets, n8n URLs, payment credentials, and signing keys in managed secrets storage; rotate any key that has appeared in local files or logs.
 4. **Authentication and authorization:** replace single shared bearer tokens with user/service identities, roles, least privilege, and audit attribution.
 5. **Workflow evidence:** prove HubSpot lead → Bid → Proposal/Contract → Build → Change Order → Invoice/AR → Closeout on three live jobs with source-document reconciliation.
@@ -36,7 +38,7 @@ curl http://127.0.0.1:8000/health/live
 curl -i http://127.0.0.1:8000/health/ready
 ```
 
-Expected result: `/health/live` returns `200`; `/health/ready` returns `503` until the hard blockers are closed. That is the correct staged outcome.
+Expected result in staging: `/health/live` returns `200`; `/health/ready` remains `503` until broader acceptance gates are complete. With `APP_ENV=production`, the legacy investor/token routes are disabled and readiness can become `200` only after valid configuration, database reachability, and the persistent GCagent repository are demonstrated.
 
 ## Promotion gate
 
