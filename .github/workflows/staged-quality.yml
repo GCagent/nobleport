@@ -28,3 +28,22 @@ jobs:
         run: pytest -q
       - name: Build container image
         run: docker build --tag nobleport-api:ci .
+      - name: Smoke-test staged API and PostgreSQL
+        env:
+          POSTGRES_PASSWORD: ci-local-only-password
+          GCAGENT_API_TOKENS: ci-local-only-bearer-token
+        run: |
+          set -euo pipefail
+          docker compose up --build --detach
+          trap 'docker compose down --volumes --remove-orphans' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8000/health/live > /tmp/live.json; then
+              break
+            fi
+            sleep 2
+          done
+          test -s /tmp/live.json
+          test "$(python -c 'import json; print(json.load(open("/tmp/live.json"))["status"])')" = "alive"
+          readiness_code="$(curl --silent --output /tmp/ready.json --write-out '%{http_code}' http://127.0.0.1:8000/health/ready)"
+          test "$readiness_code" = "503"
+          python -c 'import json; data=json.load(open("/tmp/ready.json")); assert data["checks"]["database"]["ok"] is True; assert data["checks"]["field_ops_persistence"]["ok"] is True'
