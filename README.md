@@ -155,16 +155,20 @@ See `docs/verification-readiness.md` for the truth-first status table and the ev
 git clone https://github.com/GCagent/nobleport.git
 cd nobleport
 
-# Install dependencies
-npm install  # Frontend
-pip install -r requirements.txt  # Backend
+# Install backend dependencies
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
 # Set up environment variables
 cp .env.example .env
 
-# Run development servers
-npm run dev  # Frontend (port 3000)
-uvicorn api.main:app --reload  # Backend (port 8000)
+# Run the FastAPI backend
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+
+# In a second terminal, smoke-test the running API
+curl http://127.0.0.1:8000/
+curl http://127.0.0.1:8000/api/properties
 ```
 
 ## 📁 Repository Structure
@@ -178,12 +182,6 @@ nobleport/
 │   ├── main.py        # API endpoints
 │   ├── models.py      # Data models
 │   └── blockchain.py  # Blockchain integration
-├── frontend/          # React application
-│   ├── src/
-│   │   ├── pages/     # Page components
-│   │   ├── components/# Reusable components
-│   │   └── hooks/     # Custom React hooks
-│   └── public/        # Static assets
 ├── docs/              # Documentation
 │   ├── technical-specs.md
 │   ├── compliance.md
