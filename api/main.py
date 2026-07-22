@@ -10,10 +10,10 @@ This API provides endpoints for:
 - Multi-chain blockchain integration
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from enum import Enum
 import hashlib
@@ -64,6 +64,16 @@ class BlockchainNetwork(str, Enum):
     BNB_CHAIN = "bnb_chain"
     OPTIMISM = "optimism"
     BASE = "base"
+
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    TRIALING = "trialing"
+
+class PlanType(str, Enum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
 
 # Data Models
 
@@ -130,15 +140,148 @@ class TokenTransaction(BaseModel):
 
 class Portfolio(BaseModel):
     investor_id: str
-    holdings: List[Dict[str, any]] = []
+    holdings: List[Dict[str, Any]] = []
     total_value: float = 0.0
     total_tokens: int = 0
     properties_count: int = 0
+
+class Student(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    parent_id: str
+    grade_level: str
+    subjects: List[str]
+    weak_areas: List[str] = []
+    learning_speed: str = "standard"
+    current_plan: str = "math_k3_mastery_track"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Skill(BaseModel):
+    id: str
+    subject: str
+    grade_band: str
+    name: str
+
+class Item(BaseModel):
+    id: str
+    skill_id: str
+    prompt: str
+    answer: str
+    difficulty: int = 1
+    version: int = 1
+
+class LearningAttempt(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    item_id: str
+    skill_id: str
+    is_correct: bool
+    submitted_answer: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MasteryState(BaseModel):
+    student_id: str
+    skill_id: str
+    p_mastered: float = 0.2
+    streak: int = 0
+    spaced_successes: int = 0
+    last_attempt_at: Optional[datetime] = None
+    recent_verification_passed: bool = False
+    capstone_passed: bool = False
+
+class CertificateAward(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    name: str = "NoblePort Certificate of Mastery"
+    skill_ids: List[str]
+    attempt_ids: List[str]
+    mastery_snapshot: Dict[str, float]
+    item_versions: Dict[str, int]
+    evidence_hash: str
+    audit_chain_seq: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CheckoutRequest(BaseModel):
+    parent_id: str
+
+class WebhookRequest(BaseModel):
+    parent_id: str
+    subscription_status: SubscriptionStatus
+
+class AttemptRequest(BaseModel):
+    student_id: str
+    item_id: str
+    submitted_answer: str
+
+class CertificateEvaluateRequest(BaseModel):
+    student_id: str
 
 # In-memory storage (replace with PostgreSQL in production)
 properties_db: Dict[str, Property] = {}
 investors_db: Dict[str, Investor] = {}
 transactions_db: Dict[str, TokenTransaction] = {}
+subscriptions_db: Dict[str, Dict[str, Any]] = {}
+students_db: Dict[str, Student] = {}
+skills_db: Dict[str, Skill] = {}
+items_db: Dict[str, Item] = {}
+attempts_db: Dict[str, LearningAttempt] = {}
+mastery_db: Dict[str, MasteryState] = {}
+certificate_db: Dict[str, List[CertificateAward]] = {}
+audit_log_db: Dict[str, List[Dict[str, Any]]] = {}
+daily_log_db: Dict[str, str] = {}
+
+def _audit(student_id: str, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    chain = audit_log_db.setdefault(student_id, [])
+    previous_hash = chain[-1]["hash"] if chain else "GENESIS"
+    seq = len(chain) + 1
+    data = f"{student_id}|{seq}|{action}|{payload}|{previous_hash}"
+    current_hash = hashlib.sha256(data.encode()).hexdigest()
+    event = {"seq": seq, "action": action, "payload": payload, "previous_hash": previous_hash, "hash": current_hash, "at": datetime.utcnow()}
+    chain.append(event)
+    return event
+
+def _require_paid(parent_id: str):
+    sub = subscriptions_db.get(parent_id)
+    if not sub or sub["status"] not in {SubscriptionStatus.ACTIVE.value, SubscriptionStatus.TRIALING.value}:
+        raise HTTPException(status_code=402, detail="Active payment required")
+
+def _daily_log_key(student_id: str) -> str:
+    return f"{student_id}:{datetime.utcnow().date().isoformat()}"
+
+def _seed_learning_content():
+    if skills_db:
+        return
+    skills = [
+        Skill(id="math-k-1-addition", subject="math", grade_band="K-1", name="Addition Foundations"),
+        Skill(id="math-1-2-subtraction", subject="math", grade_band="1-2", name="Subtraction Foundations"),
+        Skill(id="math-2-3-multiplication", subject="math", grade_band="2-3", name="Multiplication Basics"),
+    ]
+    for s in skills:
+        skills_db[s.id] = s
+    seeded_items = [
+        Item(id="item-1", skill_id="math-k-1-addition", prompt="2 + 3 = ?", answer="5"),
+        Item(id="item-2", skill_id="math-k-1-addition", prompt="4 + 1 = ?", answer="5"),
+        Item(id="item-3", skill_id="math-1-2-subtraction", prompt="9 - 4 = ?", answer="5"),
+        Item(id="item-4", skill_id="math-2-3-multiplication", prompt="2 x 3 = ?", answer="6"),
+    ]
+    for i in seeded_items:
+        items_db[i.id] = i
+
+def _bkt_update(state: MasteryState, is_correct: bool) -> MasteryState:
+    p_learn, p_guess, p_slip = 0.15, 0.2, 0.1
+    prior = state.p_mastered
+    if is_correct:
+        numer = prior * (1 - p_slip)
+        denom = numer + (1 - prior) * p_guess
+    else:
+        numer = prior * p_slip
+        denom = numer + (1 - prior) * (1 - p_guess)
+    posterior = numer / denom if denom else prior
+    posterior = posterior + (1 - posterior) * p_learn
+    state.p_mastered = max(0.01, min(0.99, posterior))
+    state.streak = state.streak + 1 if is_correct else 0
+    state.spaced_successes = min(3, state.spaced_successes + 1) if is_correct else 0
+    state.last_attempt_at = datetime.utcnow()
+    return state
 
 # API Endpoints
 
@@ -158,6 +301,24 @@ async def root():
             "USDC stablecoin payments"
         ]
     }
+
+@app.post("/checkout/monthly")
+async def checkout_monthly(request: CheckoutRequest):
+    subscriptions_db[request.parent_id] = {"plan": PlanType.MONTHLY.value, "price": 99, "status": SubscriptionStatus.ACTIVE.value}
+    return {"message": "Subscription activated", "plan": "monthly", "price": 99}
+
+@app.post("/checkout/yearly")
+async def checkout_yearly(request: CheckoutRequest):
+    subscriptions_db[request.parent_id] = {"plan": PlanType.YEARLY.value, "price": 999, "status": SubscriptionStatus.ACTIVE.value}
+    return {"message": "Subscription activated", "plan": "yearly", "price": 999}
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: WebhookRequest):
+    if request.parent_id not in subscriptions_db:
+        subscriptions_db[request.parent_id] = {"plan": PlanType.MONTHLY.value, "price": 99, "status": request.subscription_status.value}
+    else:
+        subscriptions_db[request.parent_id]["status"] = request.subscription_status.value
+    return {"received": True}
 
 # Property Endpoints
 
@@ -456,7 +617,131 @@ async def get_supported_networks():
         ]
     }
 
+# NoblePort AI Teacher (paid product) endpoints
+@app.post("/students", response_model=Student, status_code=status.HTTP_201_CREATED)
+async def create_student(student: Student):
+    _require_paid(student.parent_id)
+    students_db[student.id] = student
+    _seed_learning_content()
+    _audit(student.id, "student_created", student.model_dump())
+    return student
+
+@app.get("/students/{student_id}", response_model=Student)
+async def get_student(student_id: str):
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    _require_paid(students_db[student_id].parent_id)
+    return students_db[student_id]
+
+@app.get("/skills")
+async def get_skills(subject: str = "math"):
+    _seed_learning_content()
+    return [s for s in skills_db.values() if s.subject == subject]
+
+@app.post("/students/{student_id}/daily-log")
+async def submit_daily_log(student_id: str):
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    key = _daily_log_key(student_id)
+    daily_log_db[key] = "done"
+    _audit(student_id, "daily_log_submitted", {"key": key})
+    return {"logged": True, "date": datetime.utcnow().date().isoformat()}
+
+@app.get("/items/next")
+async def get_next_item(student_id: str):
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    _require_paid(students_db[student_id].parent_id)
+    if _daily_log_key(student_id) not in daily_log_db:
+        raise HTTPException(status_code=423, detail="Daily assignment is locked until daily log is submitted")
+    _seed_learning_content()
+    attempted_ids = {a.item_id for a in attempts_db.values() if a.student_id == student_id}
+    for item in items_db.values():
+        if item.id not in attempted_ids:
+            return item
+    return list(items_db.values())[0]
+
+@app.post("/attempts", response_model=LearningAttempt)
+async def submit_attempt(request: AttemptRequest):
+    student_id = request.student_id
+    item_id = request.item_id
+    submitted_answer = request.submitted_answer
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    _require_paid(students_db[student_id].parent_id)
+    if item_id not in items_db:
+        raise HTTPException(status_code=404, detail="Item not found")
+    item = items_db[item_id]
+    is_correct = item.answer.strip().lower() == submitted_answer.strip().lower()
+    attempt = LearningAttempt(student_id=student_id, item_id=item_id, skill_id=item.skill_id, is_correct=is_correct, submitted_answer=submitted_answer)
+    attempts_db[attempt.id] = attempt
+    mastery_key = f"{student_id}:{item.skill_id}"
+    state = mastery_db.get(mastery_key) or MasteryState(student_id=student_id, skill_id=item.skill_id)
+    mastery_db[mastery_key] = _bkt_update(state, is_correct)
+    _audit(student_id, "attempt_submitted", {"attempt_id": attempt.id, "item_id": item_id, "is_correct": is_correct, "p_mastered": mastery_db[mastery_key].p_mastered})
+    return attempt
+
+@app.get("/mastery/{student_id}")
+async def get_mastery(student_id: str):
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    _require_paid(students_db[student_id].parent_id)
+    rows = [m for m in mastery_db.values() if m.student_id == student_id]
+    return rows
+
+@app.post("/certificates/evaluate")
+async def evaluate_certificate(request: CertificateEvaluateRequest):
+    student_id = request.student_id
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    _require_paid(students_db[student_id].parent_id)
+    states = [m for m in mastery_db.values() if m.student_id == student_id]
+    if not states:
+        raise HTTPException(status_code=400, detail="No mastery state found")
+    eligible = all(m.p_mastered >= 0.95 and m.spaced_successes >= 3 for m in states)
+    for m in states:
+        m.recent_verification_passed = m.p_mastered >= 0.95
+        m.capstone_passed = m.spaced_successes >= 3
+    if not eligible:
+        raise HTTPException(status_code=400, detail="No mastery proof available for certificate")
+    student_attempts = [a for a in attempts_db.values() if a.student_id == student_id]
+    snapshot = {m.skill_id: m.p_mastered for m in states}
+    item_versions = {a.item_id: items_db[a.item_id].version for a in student_attempts}
+    evidence_payload = f"{student_id}|{snapshot}|{item_versions}|{[a.id for a in student_attempts]}"
+    evidence_hash = hashlib.sha256(evidence_payload.encode()).hexdigest()
+    audit_event = _audit(student_id, "certificate_evaluated", {"evidence_hash": evidence_hash})
+    cert = CertificateAward(student_id=student_id, skill_ids=list(snapshot.keys()), attempt_ids=[a.id for a in student_attempts], mastery_snapshot=snapshot, item_versions=item_versions, evidence_hash=evidence_hash, audit_chain_seq=audit_event["seq"])
+    certificate_db.setdefault(student_id, []).append(cert)
+    return cert
+
+@app.get("/certificates/{student_id}")
+async def get_certificates(student_id: str):
+    if student_id not in students_db:
+        raise HTTPException(status_code=404, detail="Student not found")
+    _require_paid(students_db[student_id].parent_id)
+    return certificate_db.get(student_id, [])
+
+@app.get("/parent/dashboard")
+async def parent_dashboard(parent_id: str):
+    _require_paid(parent_id)
+    children = [s for s in students_db.values() if s.parent_id == parent_id]
+    return {
+        "product": "NoblePort AI Teacher",
+        "positioning": "Parent-directed AI tutor + mastery credential system",
+        "disclosure": "Not an accredited school, licensed teacher replacement, or diploma issuer.",
+        "students": len(children),
+        "mastery_rows": len([m for m in mastery_db.values() if m.student_id in {c.id for c in children}]),
+        "certificates_awarded": sum(len(certificate_db.get(c.id, [])) for c in children),
+    }
+
+@app.get("/audit-log/{student_id}")
+async def get_audit_log(student_id: str):
+    if student_id in students_db:
+        _require_paid(students_db[student_id].parent_id)
+    if student_id not in audit_log_db:
+        return []
+    return audit_log_db[student_id]
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
