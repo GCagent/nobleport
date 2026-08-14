@@ -186,8 +186,8 @@ nobleport/
 │   └── public/        # Static assets
 ├── docs/              # Documentation
 │   ├── technical-specs.md
-│   ├── compliance.md
-│   └── api-reference.md
+│   ├── overview.md
+│   └── voice-deploy-pipeline.md
 └── README.md
 ```
 
