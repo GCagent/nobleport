@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 
@@ -325,7 +325,7 @@ async def issue_investor_pass(investor_id: str) -> Dict[str, object]:
 async def purchase_tokens(
     property_id: str,
     investor_id: str,
-    token_amount: int = Field(gt=0),
+    token_amount: int = Query(gt=0),
     blockchain_network: BlockchainNetwork = BlockchainNetwork.SOLANA,
 ) -> TokenTransaction:
     if property_id not in properties_db:
