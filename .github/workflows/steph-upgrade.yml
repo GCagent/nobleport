@@ -30,13 +30,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           if [ -f requirements-steph-bot.txt ]; then pip install -r requirements-steph-bot.txt; fi
-          pip install pytest
+          pip install pytest pytest-asyncio
 
       - name: Compile Python
         run: python -m compileall api bots tests
 
       - name: Run geometric reasoning tests
-        run: pytest -q tests/test_geometric_reasoning.py
+        run: python -m pytest -q tests/test_geometric_reasoning.py
 
       - name: Run Stephanie bot tests
-        run: pytest -q tests/test_steph_bot_safety.py tests/test_steph_bot_connection.py
+        run: python -m pytest -q tests/test_steph_bot_safety.py tests/test_steph_bot_connection.py
