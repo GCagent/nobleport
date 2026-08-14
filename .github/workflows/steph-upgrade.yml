@@ -1,0 +1,42 @@
+name: Stephanie Bot Upgrade Gate
+
+on:
+  push:
+    branches:
+      - upgrade/steph-bot-connected-20260814
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-steph-bot.txt ]; then pip install -r requirements-steph-bot.txt; fi
+          pip install pytest
+
+      - name: Compile Python
+        run: python -m compileall api bots tests
+
+      - name: Run geometric reasoning tests
+        run: pytest -q tests/test_geometric_reasoning.py
+
+      - name: Run Stephanie bot tests
+        run: pytest -q tests/test_steph_bot_safety.py tests/test_steph_bot_connection.py
