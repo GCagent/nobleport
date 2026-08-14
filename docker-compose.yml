@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nobleport}
+      POSTGRES_USER: ${POSTGRES_USER:-nobleport}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations/001_gcagent_core.sql:/docker-entrypoint-initdb.d/001_gcagent_core.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+    environment:
+      APP_ENV: staging
+      APP_VERSION: ${APP_VERSION:-1.2.0}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nobleport}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nobleport}
+      PERSISTENCE_BACKEND: postgres
+      GCAGENT_API_TOKENS: ${GCAGENT_API_TOKENS:?set GCAGENT_API_TOKENS in .env}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

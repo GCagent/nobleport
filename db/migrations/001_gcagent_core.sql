@@ -1,5 +1,8 @@
+-- GCagent field-operations persistence schema.
+-- Text IDs preserve NoblePort canonical project IDs such as NP-GLORIA-2026-001.
+
 CREATE TABLE IF NOT EXISTS gcagent_jobs (
-    id UUID PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     location TEXT,
     status TEXT NOT NULL DEFAULT 'active',
@@ -8,8 +11,8 @@ CREATE TABLE IF NOT EXISTS gcagent_jobs (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_tasks (
-    id UUID PRIMARY KEY,
-    job_id UUID NOT NULL REFERENCES gcagent_jobs(id),
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES gcagent_jobs(id),
     source TEXT NOT NULL,
     category TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -21,9 +24,9 @@ CREATE TABLE IF NOT EXISTS gcagent_tasks (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_audit_logs (
-    id UUID PRIMARY KEY,
-    job_id UUID REFERENCES gcagent_jobs(id),
-    task_id UUID REFERENCES gcagent_tasks(id),
+    id TEXT PRIMARY KEY,
+    job_id TEXT REFERENCES gcagent_jobs(id),
+    task_id TEXT REFERENCES gcagent_tasks(id),
     actor TEXT NOT NULL,
     action TEXT NOT NULL,
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -33,8 +36,8 @@ CREATE TABLE IF NOT EXISTS gcagent_audit_logs (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_retry_queue (
-    id UUID PRIMARY KEY,
-    task_id UUID NOT NULL REFERENCES gcagent_tasks(id),
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL REFERENCES gcagent_tasks(id),
     target TEXT NOT NULL,
     payload JSONB NOT NULL,
     attempts INTEGER NOT NULL DEFAULT 0,
@@ -46,9 +49,9 @@ CREATE TABLE IF NOT EXISTS gcagent_retry_queue (
 );
 
 CREATE TABLE IF NOT EXISTS gcagent_change_orders (
-    id UUID PRIMARY KEY,
-    job_id UUID NOT NULL REFERENCES gcagent_jobs(id),
-    task_id UUID REFERENCES gcagent_tasks(id),
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES gcagent_jobs(id),
+    task_id TEXT REFERENCES gcagent_tasks(id),
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     cost_delta NUMERIC(12, 2) NOT NULL DEFAULT 0,
@@ -60,3 +63,8 @@ CREATE TABLE IF NOT EXISTS gcagent_change_orders (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_gcagent_tasks_job_id ON gcagent_tasks(job_id);
+CREATE INDEX IF NOT EXISTS idx_gcagent_audit_logs_job_created ON gcagent_audit_logs(job_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_gcagent_retry_queue_status_next ON gcagent_retry_queue(status, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_gcagent_change_orders_job_id ON gcagent_change_orders(job_id);
