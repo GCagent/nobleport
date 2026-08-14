@@ -4,7 +4,9 @@
 
 **Report for:** Haven't.ai Construction Operations Manager Sub-Agent
 
-**Author:** Manus AI
+**Author:** Operator (tool-assisted draft; original AI-attributed authorship withdrawn)
+
+> **Verification note:** This report is retained as a historical working artifact. Operational metrics in this file must not be treated as verified production evidence unless they are reconciled against source instruments and linked from the truth-first evidence plan.
 
 ## 1. Executive Summary
 
