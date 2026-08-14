@@ -25,7 +25,7 @@ jobs:
       - name: Compile API package
         run: python -m compileall api
       - name: Run tests
-        run: pytest -q
+        run: python -m pytest -q
       - name: Build container image
         run: docker build --tag nobleport-api:ci .
       - name: Smoke-test staged API and PostgreSQL
