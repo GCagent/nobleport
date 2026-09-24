@@ -82,6 +82,10 @@ Noble Port documentation distinguishes between implemented repository assets, ar
 
 See `docs/verification-readiness.md` for the truth-first status table and the evidence package required to move from architecture artifacts to institutional-grade operating proof.
 
+## Payments integration
+
+Projects deployed through Lovable Cloud can use Lovable's built-in Stripe onboarding and catalog workflow. See `docs/lovable-stripe-payments.md` for prerequisites, setup, test-card guidance, the production checklist, and the alternative path for external Supabase projects.
+
 ## 🏗️ Architecture
 
 ### API-First Design
@@ -252,4 +256,3 @@ This repository contains proprietary code and documentation. Unauthorized copyin
 **Built with blockchain innovation that enhances regulatory frameworks.**
 
 *Noble Port Realty is a NoblePort Systems platform, integrating with Stephanie.ai for AI-driven optimization and the NoblePort Operations Monitor for comprehensive oversight.*
-
