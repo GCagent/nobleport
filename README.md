@@ -82,6 +82,13 @@ Noble Port documentation distinguishes between implemented repository assets, ar
 
 See `docs/verification-readiness.md` for the truth-first status table and the evidence package required to move from architecture artifacts to institutional-grade operating proof.
 
+## Agent Operations
+
+To run Hermes with a local Ollama-compatible model provider, follow the
+[Hermes and Ollama operator guide](docs/hermes-ollama.md). The guide covers the
+one-command launcher, initial configuration, messaging gateways, and common
+troubleshooting steps.
+
 ## 🏗️ Architecture
 
 ### API-First Design
@@ -252,4 +259,3 @@ This repository contains proprietary code and documentation. Unauthorized copyin
 **Built with blockchain innovation that enhances regulatory frameworks.**
 
 *Noble Port Realty is a NoblePort Systems platform, integrating with Stephanie.ai for AI-driven optimization and the NoblePort Operations Monitor for comprehensive oversight.*
-
