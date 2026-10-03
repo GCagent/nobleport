@@ -139,6 +139,10 @@ See `docs/verification-readiness.md` for the truth-first status table and the ev
 
 ## 🚀 Getting Started
 
+### ENS name setup
+
+To connect a wallet and register `noblport.eth`, use the [official ENS App registration link](https://app.ens.domains/noblport.eth). For the two-transaction flow, pricing, browser-safety notes, and troubleshooting, see [Register a `.eth` name](docs/register-eth-name.md).
+
 ### For Investors
 
 1. **Register** - Create account with email and wallet address
@@ -252,4 +256,3 @@ This repository contains proprietary code and documentation. Unauthorized copyin
 **Built with blockchain innovation that enhances regulatory frameworks.**
 
 *Noble Port Realty is a NoblePort Systems platform, integrating with Stephanie.ai for AI-driven optimization and the NoblePort Operations Monitor for comprehensive oversight.*
-

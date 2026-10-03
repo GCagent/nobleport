@@ -12,7 +12,7 @@ class Settings:
     ENS_REGISTRY_ADDRESS: str = os.getenv(
         "ENS_REGISTRY_ADDRESS", "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
     )
-    ENS_NAME: str = os.getenv("ENS_NAME", "nobleport.eth")
+    ENS_NAME: str = os.getenv("ENS_NAME", "noblport.eth")
     ENS_PRIVATE_KEY: str = os.getenv("ENS_PRIVATE_KEY", "")
     ENS_DEFAULT_COIN_TYPE: int = int(os.getenv("ENS_DEFAULT_COIN_TYPE", "60"))
 
