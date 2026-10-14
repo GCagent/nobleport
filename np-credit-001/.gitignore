@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*_rsa*
+uploads/
+*.zip
+*.db
+*.sqlite
+*.sqlite*
+*.sqlite3
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.pyc
